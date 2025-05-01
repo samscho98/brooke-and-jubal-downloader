@@ -1,5 +1,5 @@
 """
-Playlist Manager Component
+Playlist Manager Component with Update All Button in Bottom Left
 Manages the playlist management interface in the GUI application
 """
 import os
@@ -86,27 +86,56 @@ class PlaylistPanel(ttk.Frame):
         self.playlist_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
+        # Add double-click binding for editing
+        self.playlist_tree.bind("<Double-1>", self._on_double_click)
+        
         # Add button frame below the treeview
         button_frame = ttk.Frame(self)
         button_frame.pack(fill=tk.X, padx=5, pady=5)
         
         # Add buttons
         ttk.Button(button_frame, text="Remove Selected", command=self._remove_playlist).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Edit Selected", command=self._edit_playlist).pack(side=tk.LEFT, padx=5)  # New edit button
         ttk.Button(button_frame, text="Download Selected Now", command=self._download_selected).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Check for Valid URL", command=self._validate_url).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Refresh List", command=self.refresh_playlists).pack(side=tk.RIGHT, padx=5)
         
-        # Status frame
-        status_frame = ttk.LabelFrame(self, text="Playlist Status")
+        # Status frame with Update All button in bottom left
+        status_frame = ttk.Frame(self)
         status_frame.pack(fill=tk.X, padx=5, pady=5)
         
+        # Add Update All button to bottom left corner
+        update_all_button = ttk.Button(
+            status_frame, 
+            text="Update All Playlists", 
+            command=self._update_all_playlists,
+            style="Accent.TButton"  # Special style for emphasis
+        )
+        update_all_button.pack(side=tk.LEFT, padx=5)
+        
+        # Create a style for the Update All button to make it stand out
+        self.style = ttk.Style()
+        if "Accent.TButton" not in self.style.theme_names():
+            # Only create the style if it doesn't exist
+            self.style.configure("Accent.TButton", font=("", 10, "bold"))
+        
+        # Status panel on the right side of the status frame
+        status_panel = ttk.LabelFrame(status_frame, text="Playlist Status")
+        status_panel.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=5)
+        
         self.status_var = tk.StringVar(value="Ready")
-        status_label = ttk.Label(status_frame, textvariable=self.status_var)
+        status_label = ttk.Label(status_panel, textvariable=self.status_var)
         status_label.pack(fill=tk.X, padx=5, pady=5)
         
         # Load playlists
         self.refresh_playlists()
+    
+    def _on_double_click(self, event):
+        """Handle double-click event on playlist treeview"""
+        # Get the item that was clicked
+        item = self.playlist_tree.identify('item', event.x, event.y)
+        if item:
+            # Call the edit function
+            self._edit_playlist()
     
     def _add_playlist(self):
         """Add a playlist to the tracker"""
@@ -163,6 +192,44 @@ class PlaylistPanel(ttk.Frame):
                 self.refresh_playlists()
             else:
                 messagebox.showerror("Error", "Failed to remove playlist")
+                
+    def _update_all_playlists(self):
+        """Update all tracked playlists"""
+        playlists = self.tracker.get_playlists()
+        
+        if not playlists:
+            messagebox.showinfo("Info", "No playlists are being tracked")
+            return
+            
+        # Ask for confirmation
+        if not messagebox.askyesno("Confirm", f"Update all {len(playlists)} tracked playlists?\n\nThis will launch the console application."):
+            return
+            
+        # Now we need to find and launch the main application script
+        main_script = os.path.join(parent_dir, "main.py")
+        
+        if not os.path.exists(main_script):
+            messagebox.showerror("Error", f"Could not find main script: {main_script}")
+            return
+            
+        try:
+            # Construct command to update all playlists
+            cmd = [sys.executable, main_script, "--update-all"]
+            
+            # Execute in a new console window on Windows
+            if sys.platform == "win32":
+                import subprocess
+                subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            else:
+                # For other platforms, just run the command
+                import subprocess
+                subprocess.Popen(cmd)
+                
+            self.status_var.set(f"Launched update for all playlists")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to launch updater: {str(e)}")
+            self.status_var.set(f"Error: {str(e)}")
     
     def _edit_playlist(self):
         """Edit the selected playlist"""

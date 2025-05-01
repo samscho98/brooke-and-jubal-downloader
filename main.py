@@ -111,6 +111,8 @@ def parse_arguments() -> argparse.Namespace:
     
     return parser.parse_args()
 
+# Update the display_playlists function in main.py to handle None values properly
+
 def display_playlists(tracker: DownloadTracker) -> None:
     """
     Display all tracked playlists.
@@ -132,9 +134,14 @@ def display_playlists(tracker: DownloadTracker) -> None:
         interval = playlist.get("check_interval", 24)
         last_checked = playlist.get("last_checked", "Never")
         
-        if last_checked != "Never":
+        # Fix: Check if last_checked is None or "Never" before trying to convert it
+        if last_checked is not None and last_checked != "Never":
             from datetime import datetime
-            last_checked = datetime.fromisoformat(last_checked).strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                last_checked = datetime.fromisoformat(last_checked).strftime("%Y-%m-%d %H:%M:%S")
+            except (ValueError, TypeError) as e:
+                print(f"Warning: Invalid date format for playlist {name}: {e}")
+                last_checked = str(last_checked)
         
         print(f"{i}. {name}")
         print(f"   URL: {url}")
@@ -186,8 +193,11 @@ def update_playlists(tracker: DownloadTracker, downloader: YouTubeDownloader, co
         
         if not new_videos:
             print("All videos have already been downloaded")
+            # Update the last checked time even if no new videos
+            tracker.update_playlist_check_time(url)
+            continue
         else:
-            print(f"Downloading {len(new_videos)} new videos...")
+            print(f"Found {len(new_videos)} new videos to download...")
             
             for i, video in enumerate(new_videos, 1):
                 print(f"  [{i}/{len(new_videos)}] Downloading: {video['title']}")

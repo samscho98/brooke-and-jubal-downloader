@@ -11,6 +11,7 @@ from tkinter import ttk, filedialog, messagebox
 import subprocess
 from datetime import datetime
 import traceback
+import threading
 
 # Add parent directory to path to allow imports from main project
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -31,9 +32,9 @@ class PlaylistDownloaderGUI:
     def __init__(self, root):
         """Initialize the GUI application"""
         self.root = root
-        self.root.title("YouTube Playlist Downloader - Settings")
-        self.root.geometry("800x600")
-        self.root.minsize(700, 500)
+        self.root.title("YouTube Playlist Downloader")
+        self.root.geometry("950x650")
+        self.root.minsize(900, 600)
         
         # Initialize configuration and trackers
         self.config = ConfigHandler("config.ini")
@@ -42,25 +43,28 @@ class PlaylistDownloaderGUI:
                 playlists_file="gui_app/playlists.json"
             )
         self.output_dir = self.config.get("general", "output_directory")
+        self.downloader = YouTubeDownloader(self.output_dir, self.config)
         
         # Create main frame with padding
         self.main_frame = ttk.Frame(self.root, padding="10")
         self.main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Create notebook (tabs)
+        # Create notebook (tabs) at the top
         self.notebook = ttk.Notebook(self.main_frame)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # Create tabs with component panels
         self.playlists_tab = PlaylistPanel(self.notebook, self.tracker)
+        self.single_video_tab = self._create_single_video_tab()
         self.settings_tab = SettingsPanel(self.notebook, self.config)
         self.about_tab = self._create_about_tab()
         
         self.notebook.add(self.playlists_tab, text="Playlists")
+        self.notebook.add(self.single_video_tab, text="Download Video")
         self.notebook.add(self.settings_tab, text="Settings")
         self.notebook.add(self.about_tab, text="About")
         
-        # Create action buttons at the bottom
+        # Create button frame at the bottom
         self.button_frame = ttk.Frame(self.main_frame)
         self.button_frame.pack(fill=tk.X, pady=10)
         
@@ -79,6 +83,67 @@ class PlaylistDownloaderGUI:
             command=self._save_settings
         )
         self.save_button.pack(side=tk.RIGHT, padx=5)
+        
+    def _create_single_video_tab(self):
+        """Create the single video download tab"""
+        video_frame = ttk.Frame(self.notebook, padding="20")
+        
+        # Title
+        title_label = ttk.Label(
+            video_frame, 
+            text="Download Single YouTube Video", 
+            font=("Arial", 14, "bold")
+        )
+        title_label.pack(pady=(10, 20))
+        
+        # Input frame
+        input_frame = ttk.Frame(video_frame)
+        input_frame.pack(fill=tk.X, pady=10)
+        
+        # Video URL entry
+        ttk.Label(input_frame, text="Video URL:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+        self.video_url_var = tk.StringVar()
+        url_entry = ttk.Entry(input_frame, textvariable=self.video_url_var, width=60)
+        url_entry.grid(row=0, column=1, sticky=tk.EW, padx=5, pady=5)
+        
+        # Audio format selection
+        ttk.Label(input_frame, text="Audio Format:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
+        self.video_format_var = tk.StringVar(value=self.config.get("audio", "format", "mp3"))
+        format_combo = ttk.Combobox(input_frame, textvariable=self.video_format_var, 
+                                   values=["mp3", "wav", "m4a", "ogg"], width=10)
+        format_combo.grid(row=1, column=1, sticky=tk.W, padx=5, pady=5)
+        
+        # Download button
+        download_button = ttk.Button(
+            video_frame,
+            text="Download Video",
+            command=self._download_single_video,
+            width=20
+        )
+        download_button.pack(pady=20)
+        
+        # Status frame
+        status_frame = ttk.LabelFrame(video_frame, text="Status")
+        status_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        self.video_status_var = tk.StringVar(value="Ready to download")
+        status_label = ttk.Label(status_frame, textvariable=self.video_status_var, padding=10)
+        status_label.pack(fill=tk.X)
+        
+        # Instructions
+        instructions = """
+Enter a YouTube video URL above and click "Download Video" to download it as an audio file.
+The audio will be saved in the output directory specified in Settings.
+
+Supported formats: MP3, WAV, M4A, OGG
+        """
+        instructions_label = ttk.Label(video_frame, text=instructions, justify=tk.LEFT, wraplength=500)
+        instructions_label.pack(pady=20, anchor=tk.W)
+        
+        # Configure grid to expand with window
+        input_frame.columnconfigure(1, weight=1)
+        
+        return video_frame
         
     def _create_about_tab(self):
         """Create the About tab"""
@@ -131,6 +196,58 @@ Features:
         copyright_label.pack(pady=5)
         
         return about_frame
+    
+    def _download_single_video(self):
+        """Download a single YouTube video"""
+        url = self.video_url_var.get().strip()
+        
+        if not url:
+            messagebox.showerror("Error", "Please enter a YouTube video URL")
+            return
+            
+        if "youtube.com" not in url and "youtu.be" not in url:
+            messagebox.showerror("Error", "Invalid YouTube URL")
+            return
+        
+        # Ask for confirmation
+        if not messagebox.askyesno("Confirm", f"Download video:\n{url}?"):
+            return
+            
+        self.video_status_var.set("Downloading video...")
+        
+        # Get audio format from settings
+        audio_format = self.video_format_var.get()
+        
+        def download_thread():
+            try:
+                # Update the format in config
+                self.config.set("audio", "format", audio_format)
+                
+                # Run the download
+                result = self.downloader.download_video(url, audio_only=True)
+                
+                # Update UI in the main thread
+                self.root.after(100, lambda: self._update_download_status(result))
+                
+            except Exception as e:
+                # Update UI in the main thread
+                error_msg = str(e)
+                self.root.after(100, lambda: self._update_download_status(None, error_msg))
+            
+        # Start the download thread
+        thread = threading.Thread(target=download_thread)
+        thread.daemon = True
+        thread.start()
+    
+    def _update_download_status(self, result, error=None):
+        """Update the UI after a download completes"""
+        if result:
+            self.video_status_var.set("Download completed")
+            messagebox.showinfo("Success", f"Video downloaded to:\n{result}")
+            self.video_url_var.set("")  # Clear the URL field
+        else:
+            self.video_status_var.set("Download failed")
+            messagebox.showerror("Error", f"Failed to download video: {error or 'Unknown error'}")
         
     def _save_settings(self):
         """Save settings to config file"""
@@ -165,18 +282,18 @@ Features:
         if os.path.exists(config_path):
             cmd.extend(["--config", config_path])
         
-        # Add output directory from settings
-        output_dir = self.settings_tab.output_dir_var.get()
+        # Add output directory from config
+        output_dir = self.config.get("general", "output_directory")
         if output_dir:
             cmd.extend(["--output-dir", output_dir])
         
-        # Add logging parameters from the settings panel
-        log_level = self.settings_tab.log_level_var.get()
+        # Add logging parameters from config
+        log_level = self.config.get("logging", "level", "INFO")
         if log_level:
             cmd.extend(["--log-level", log_level])
         
-        log_file = self.settings_tab.log_file_var.get()
-        if log_file and self.settings_tab.log_to_console_var.get():
+        log_file = self.config.get("logging", "file")
+        if log_file and self.config.getboolean("logging", "console", True):
             cmd.extend(["--log-file", log_file])
         
         # Add any additional arguments
