@@ -92,6 +92,7 @@ class PlaylistPanel(ttk.Frame):
         
         # Add buttons
         ttk.Button(button_frame, text="Remove Selected", command=self._remove_playlist).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Edit Selected", command=self._edit_playlist).pack(side=tk.LEFT, padx=5)  # New edit button
         ttk.Button(button_frame, text="Download Selected Now", command=self._download_selected).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Check for Valid URL", command=self._validate_url).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Refresh List", command=self.refresh_playlists).pack(side=tk.RIGHT, padx=5)
@@ -162,6 +163,111 @@ class PlaylistPanel(ttk.Frame):
                 self.refresh_playlists()
             else:
                 messagebox.showerror("Error", "Failed to remove playlist")
+    
+    def _edit_playlist(self):
+        """Edit the selected playlist"""
+        selected = self.playlist_tree.selection()
+        if not selected:
+            messagebox.showinfo("Info", "Please select a playlist to edit")
+            return
+            
+        item = self.playlist_tree.item(selected[0])
+        current_url = item["values"][1]
+        current_name = item["values"][0]
+        current_interval = item["values"][2]
+        
+        # Create edit dialog
+        edit_dialog = tk.Toplevel(self)
+        edit_dialog.title(f"Edit Playlist: {current_name}")
+        edit_dialog.geometry("500x200")
+        edit_dialog.resizable(False, False)
+        edit_dialog.transient(self)  # Make the dialog modal
+        edit_dialog.grab_set()
+        
+        # Create edit form
+        form_frame = ttk.Frame(edit_dialog, padding="10")
+        form_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # URL (read-only since it's the ID)
+        ttk.Label(form_frame, text="URL (cannot be changed):").grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+        url_entry = ttk.Entry(form_frame, width=50)
+        url_entry.insert(0, current_url)
+        url_entry.config(state='readonly')
+        url_entry.grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
+        
+        # Name
+        ttk.Label(form_frame, text="Name:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
+        name_var = tk.StringVar(value=current_name)
+        name_entry = ttk.Entry(form_frame, textvariable=name_var, width=30)
+        name_entry.grid(row=1, column=1, sticky=tk.W, padx=5, pady=5)
+        
+        # Check interval
+        ttk.Label(form_frame, text="Check interval (hours):").grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
+        interval_var = tk.StringVar(value=current_interval)
+        interval_entry = ttk.Entry(form_frame, textvariable=interval_var, width=10)
+        interval_entry.grid(row=2, column=1, sticky=tk.W, padx=5, pady=5)
+        
+        # Button frame
+        button_frame = ttk.Frame(form_frame)
+        button_frame.grid(row=3, column=0, columnspan=2, pady=15)
+        
+        # Save and Cancel buttons
+        ttk.Button(
+            button_frame, 
+            text="Save Changes",
+            command=lambda: self._save_playlist_edits(
+                edit_dialog, current_url, name_var.get(), interval_var.get()
+            )
+        ).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(
+            button_frame, 
+            text="Cancel",
+            command=edit_dialog.destroy
+        ).pack(side=tk.LEFT, padx=5)
+        
+        # Center the dialog on parent window
+        edit_dialog.update_idletasks()
+        x = self.winfo_rootx() + (self.winfo_width() - edit_dialog.winfo_width()) // 2
+        y = self.winfo_rooty() + (self.winfo_height() - edit_dialog.winfo_height()) // 2
+        edit_dialog.geometry(f"+{x}+{y}")
+    
+    def _save_playlist_edits(self, dialog, url, name, interval_str):
+        """Save the edited playlist information"""
+        if not name.strip():
+            messagebox.showerror("Error", "Name cannot be empty", parent=dialog)
+            return
+            
+        try:
+            interval = int(interval_str) if interval_str else 24
+            if interval <= 0:
+                raise ValueError("Interval must be positive")
+        except ValueError:
+            messagebox.showerror("Error", "Check interval must be a positive number", parent=dialog)
+            return
+        
+        # Find the playlist in the tracker's playlists
+        playlists = self.tracker.get_playlists()
+        found = False
+        
+        for playlist in playlists:
+            if playlist["url"] == url:
+                # Update the playlist
+                playlist["name"] = name.strip()
+                playlist["check_interval"] = interval
+                found = True
+                break
+                
+        if found:
+            # Save the updated playlists
+            if self.tracker._save_playlists():
+                messagebox.showinfo("Success", f"Updated playlist: {name}", parent=dialog)
+                dialog.destroy()
+                self.refresh_playlists()
+            else:
+                messagebox.showerror("Error", "Failed to save changes", parent=dialog)
+        else:
+            messagebox.showerror("Error", "Playlist not found", parent=dialog)
     
     def _validate_url(self):
         """Validate the playlist URL by fetching video information"""
