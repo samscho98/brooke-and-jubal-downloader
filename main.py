@@ -240,12 +240,6 @@ def main() -> int:
     """
     args = parse_arguments()
     
-    # Set up logging first
-    setup_logging(
-        log_level=args.log_level,
-        log_file=args.log_file
-    )
-    
     # Load configuration
     config = ConfigHandler(args.config)
     
@@ -254,6 +248,31 @@ def main() -> int:
         config.set("general", "output_directory", args.output_dir)
     if args.check_interval:
         config.set("general", "check_interval", str(args.check_interval))
+    
+    # Get logging settings from config, but command line args take precedence
+    log_level = args.log_level if args.log_level else config.get("logging", "level", "INFO")
+    log_file = args.log_file if args.log_file else config.get("logging", "file", None)
+    log_to_console = config.getboolean("logging", "console", True)
+    
+    # Set up logging with the determined settings
+    setup_logging(
+        log_level=log_level,
+        log_file=log_file if log_to_console else None
+    )
+    
+    # Now log some diagnostic information
+    logging.info(f"Starting application with config file: {args.config}")
+    logging.info(f"Log level: {log_level}")
+    logging.info(f"Log file: {log_file}")
+
+
+    # Add at the beginning of main() after setup_logging
+    logging.debug("This is a DEBUG message")
+    logging.info("This is an INFO message")
+    logging.warning("This is a WARNING message")
+    logging.error("This is an ERROR message") 
+    logging.critical("This is a CRITICAL message")
+    
     config.save_config()
     
     # Initialize components

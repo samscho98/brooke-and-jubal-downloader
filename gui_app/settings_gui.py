@@ -170,10 +170,19 @@ Features:
         if output_dir:
             cmd.extend(["--output-dir", output_dir])
         
+        # Add logging parameters from the settings panel
+        log_level = self.settings_tab.log_level_var.get()
+        if log_level:
+            cmd.extend(["--log-level", log_level])
+        
+        log_file = self.settings_tab.log_file_var.get()
+        if log_file and self.settings_tab.log_to_console_var.get():
+            cmd.extend(["--log-file", log_file])
+        
         # Add any additional arguments
         if extra_args:
             cmd.extend(extra_args)
-            
+        
         try:
             # Open a new console window to run the application
             if sys.platform == "win32":
