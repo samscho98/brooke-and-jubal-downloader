@@ -142,13 +142,14 @@ def display_playlists(tracker: DownloadTracker) -> None:
         print(f"   Last Checked: {last_checked}")
         print()
 
-def update_playlists(tracker: DownloadTracker, downloader: YouTubeDownloader) -> None:
+def update_playlists(tracker: DownloadTracker, downloader: YouTubeDownloader, config: ConfigHandler) -> None:
     """
     Update all playlists that need updating based on their check interval.
     
     Args:
         tracker: Download tracker instance
         downloader: YouTube downloader instance
+        config: Configuration handler instance
     """
     playlists_to_update = tracker.check_for_updates()
     
@@ -157,6 +158,12 @@ def update_playlists(tracker: DownloadTracker, downloader: YouTubeDownloader) ->
         return
     
     print(f"Updating {len(playlists_to_update)} playlists...")
+    
+    # Get audio settings from config
+    audio_format = config.get("audio", "format", "mp3")
+    audio_bitrate = config.get("audio", "bitrate", "192k")
+    normalize_audio = config.getboolean("audio", "normalize_audio", False)
+    target_level = config.getfloat("audio", "target_level", -18.0)
     
     for playlist in playlists_to_update:
         url = playlist.get("url")
@@ -191,9 +198,25 @@ def update_playlists(tracker: DownloadTracker, downloader: YouTubeDownloader) ->
                 playlist_id = playlist_id_match.group(1) if playlist_id_match else "unknown"
                 
                 # Download the video
-                file_path = downloader.download_video(video['url'], audio_only=True)
+                file_path = downloader.download_video(video['url'], audio_only=True, playlist_name=name)
                 
                 if file_path:
+                    # Check if we need to convert the file format
+                    file_ext = os.path.splitext(file_path)[1].lower().lstrip('.')
+                    if file_ext != audio_format:
+                        from downloader.converter import AudioConverter
+                        print(f"    Converting to {audio_format} format...")
+                        converted_file = AudioConverter.convert_audio(
+                            file_path, 
+                            audio_format, 
+                            bitrate=audio_bitrate
+                        )
+                        if converted_file:
+                            # Remove the original file if conversion was successful
+                            if os.path.exists(file_path) and file_path != converted_file:
+                                os.remove(file_path)
+                            file_path = converted_file
+                    
                     # Add to download history
                     tracker.add_downloaded_video(
                         video_id=video['id'],
@@ -236,8 +259,12 @@ def main() -> int:
     # Initialize components
     output_dir = config.get("general", "output_directory")
     file_manager = FileManager(output_dir)
-    downloader = YouTubeDownloader(output_dir)
-    tracker = DownloadTracker()
+    downloader = YouTubeDownloader(output_dir, config)  # <-- Pass config here
+    converter = AudioConverter()  # <-- Add this line
+    tracker = DownloadTracker(
+        history_file="gui_app/download_history.json",
+        playlists_file="gui_app/playlists.json"
+    )
     
     # Process command line arguments
     if args.add_playlist:
@@ -304,7 +331,7 @@ def main() -> int:
                 print("Failed to download video")
     
     elif args.update_all:
-        update_playlists(tracker, downloader)
+        update_playlists(tracker, downloader, config)
     
     else:
         # If no specific action, show menu
@@ -326,7 +353,17 @@ def main() -> int:
                 
                 if "list=" in url:  # It's a playlist
                     print("Detected playlist URL")
-                    successful, failed = downloader.download_playlist(url, audio_only=True)
+                    # Try to get playlist name 
+                    playlist_name = None
+                    for playlist in tracker.get_playlists():
+                        if playlist["url"] == url:
+                            playlist_name = playlist["name"]
+                            break
+                            
+                    if not playlist_name:
+                        playlist_name = input("Enter a name for this playlist (for folder organization): ")
+                        
+                    successful, failed = downloader.download_playlist(url, audio_only=True, playlist_name=playlist_name)
                     
                     print(f"\nDownloaded {len(successful)} videos, {len(failed)} failed")
                 else:  # It's a single video
@@ -374,7 +411,7 @@ def main() -> int:
                 display_playlists(tracker)
             
             elif choice == "4":
-                update_playlists(tracker, downloader)
+                update_playlists(tracker, downloader, config)
             
             elif choice == "5":
                 display_playlists(tracker)

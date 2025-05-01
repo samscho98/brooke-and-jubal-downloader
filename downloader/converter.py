@@ -13,6 +13,69 @@ logger = logging.getLogger(__name__)
 class AudioConverter:
     """Class to handle audio conversion operations."""
     
+    SUPPORTED_FORMATS = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac']
+    
+    @staticmethod
+    def convert_audio(input_file: str, output_format: str = "mp3", output_dir: Optional[str] = None, 
+                      bitrate: str = "192k") -> Optional[str]:
+        """
+        Convert an audio file to the specified format.
+        
+        Args:
+            input_file: Path to the input audio file
+            output_format: Desired output format (mp3, wav, ogg, etc.)
+            output_dir: Directory to save the output file (defaults to same as input)
+            bitrate: Audio bitrate for the output file
+            
+        Returns:
+            Path to the converted file or None if conversion failed
+        """
+        if not os.path.exists(input_file):
+            logger.error(f"Input file not found: {input_file}")
+            return None
+            
+        # Validate output format
+        output_format = output_format.lower()
+        if output_format not in AudioConverter.SUPPORTED_FORMATS:
+            logger.error(f"Unsupported output format: {output_format}. Using mp3 instead.")
+            output_format = "mp3"
+            
+        try:
+            # Determine output file path
+            if output_dir is None:
+                output_dir = os.path.dirname(input_file)
+            
+            # Create output directory if it doesn't exist
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir, exist_ok=True)
+                
+            filename = os.path.basename(input_file).rsplit(".", 1)[0]
+            output_file = os.path.join(output_dir, f"{filename}.{output_format}")
+            
+            # Check if file is already in the desired format
+            input_ext = os.path.splitext(input_file)[1].lower().lstrip('.')
+            if input_ext == output_format:
+                if input_file == output_file:
+                    logger.info(f"File is already in {output_format} format: {input_file}")
+                    return input_file
+                else:
+                    # Just copy the file
+                    import shutil
+                    shutil.copy2(input_file, output_file)
+                    logger.info(f"Copied {output_format} file to: {output_file}")
+                    return output_file
+            
+            # Convert to the desired format using pydub
+            audio = AudioSegment.from_file(input_file)
+            audio.export(output_file, format=output_format, bitrate=bitrate)
+            
+            logger.info(f"Successfully converted {input_file} to {output_format}: {output_file}")
+            return output_file
+        
+        except Exception as e:
+            logger.error(f"Error converting {input_file} to {output_format}: {str(e)}")
+            return None
+    
     @staticmethod
     def convert_to_mp3(input_file: str, output_dir: Optional[str] = None, 
                       bitrate: str = "192k") -> Optional[str]:
@@ -27,44 +90,7 @@ class AudioConverter:
         Returns:
             Path to the converted file or None if conversion failed
         """
-        if not os.path.exists(input_file):
-            logger.error(f"Input file not found: {input_file}")
-            return None
-            
-        try:
-            # Determine output file path
-            if output_dir is None:
-                output_dir = os.path.dirname(input_file)
-            
-            # Create output directory if it doesn't exist
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir, exist_ok=True)
-                
-            filename = os.path.basename(input_file).rsplit(".", 1)[0]
-            output_file = os.path.join(output_dir, f"{filename}.mp3")
-            
-            # Check if file is already MP3
-            if input_file.lower().endswith('.mp3'):
-                if input_file == output_file:
-                    logger.info(f"File is already MP3: {input_file}")
-                    return input_file
-                else:
-                    # Just copy the file
-                    import shutil
-                    shutil.copy2(input_file, output_file)
-                    logger.info(f"Copied MP3 file to: {output_file}")
-                    return output_file
-            
-            # Convert to MP3 using pydub
-            audio = AudioSegment.from_file(input_file)
-            audio.export(output_file, format="mp3", bitrate=bitrate)
-            
-            logger.info(f"Successfully converted {input_file} to MP3: {output_file}")
-            return output_file
-        
-        except Exception as e:
-            logger.error(f"Error converting {input_file} to MP3: {str(e)}")
-            return None
+        return AudioConverter.convert_audio(input_file, "mp3", output_dir, bitrate)
     
     @staticmethod
     def ffmpeg_convert(input_file: str, output_file: str, 

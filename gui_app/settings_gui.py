@@ -37,7 +37,10 @@ class PlaylistDownloaderGUI:
         
         # Initialize configuration and trackers
         self.config = ConfigHandler("config.ini")
-        self.tracker = DownloadTracker()
+        self.tracker = DownloadTracker(
+                history_file="gui_app/download_history.json",
+                playlists_file="gui_app/playlists.json"
+            )
         self.output_dir = self.config.get("general", "output_directory")
         
         # Create main frame with padding
@@ -156,6 +159,18 @@ Features:
         # Build command
         cmd = [sys.executable, main_script]
         
+        # Add configuration path
+        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
+                                "config.ini")
+        if os.path.exists(config_path):
+            cmd.extend(["--config", config_path])
+        
+        # Add output directory from settings
+        output_dir = self.settings_tab.output_dir_var.get()
+        if output_dir:
+            cmd.extend(["--output-dir", output_dir])
+        
+        # Add any additional arguments
         if extra_args:
             cmd.extend(extra_args)
             
