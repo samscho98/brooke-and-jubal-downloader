@@ -10,6 +10,26 @@ from pydub import AudioSegment
 
 logger = logging.getLogger(__name__)
 
+# Ensure FFmpeg is properly set to use the bundled version
+def _configure_ffmpeg():
+    """Configure FFmpeg path for audio processing"""
+    try:
+        # Try to find the bundled FFmpeg
+        app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        ffmpeg_path = os.path.join(app_dir, "bin", "ffmpeg.exe" if os.name == 'nt' else "ffmpeg")
+        
+        if os.path.exists(ffmpeg_path):
+            # Configure pydub to use our FFmpeg
+            AudioSegment.converter = ffmpeg_path
+            logger.info(f"Using bundled FFmpeg: {ffmpeg_path}")
+        else:
+            logger.warning("Bundled FFmpeg not found, using system FFmpeg.")
+    except Exception as e:
+        logger.error(f"Error configuring FFmpeg: {str(e)}")
+
+# Call the configuration function
+_configure_ffmpeg()
+
 class AudioConverter:
     """Class to handle audio conversion operations."""
     

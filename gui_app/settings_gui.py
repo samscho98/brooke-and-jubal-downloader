@@ -159,26 +159,65 @@ Supported formats: MP3, WAV, M4A, OGG
         
         # Description
         description = """
-A Python application that downloads videos from YouTube playlists as MP3 files 
-and keeps track of downloaded files to ensure your collection stays up to date.
+    A Python application that downloads videos from YouTube playlists as audio files 
+    and keeps track of downloaded files to ensure your collection stays up to date.
 
-This GUI is for managing the settings and playlists. 
-Use the 'Run Downloader (Console)' button to launch the main application.
+    This GUI is for managing the settings and playlists. 
+    Use the 'Run Downloader (Console)' button to launch the main application.
         """
         desc_label = ttk.Label(about_frame, text=description, justify="center", wraplength=500)
         desc_label.pack(pady=10)
         
         # Features
         features = """
-Features:
-• Download individual YouTube videos as MP3 files
-• Download entire YouTube playlists as MP3 files
-• Track playlists to check for new videos at configurable intervals
-• Maintain a history of downloaded videos to avoid duplicates
-• Convert downloaded audio to different formats if needed
+    Features:
+    - Download individual YouTube videos as audio files in multiple formats (MP3, WAV, OGG, M4A)
+    - Download entire YouTube playlists with automatic organization into folders
+    - Track playlists to check for new videos at configurable intervals
+    - Maintain a history of downloaded videos to avoid duplicates
+    - Convert downloaded audio to different formats with customizable bitrate
+    - Normalize audio levels for consistent volume across tracks
+    - Easy-to-use GUI for managing playlists and settings
+    - Powerful command-line interface for automation
         """
         features_label = ttk.Label(about_frame, text=features, justify="left", wraplength=500)
         features_label.pack(pady=10)
+        
+        # Created for
+        created_for_label = ttk.Label(
+            about_frame,
+            text="Created for:",
+            font=("Arial", 10, "bold")
+        )
+        created_for_label.pack(pady=(10, 0))
+        
+        tiktok_link = "https://www.tiktok.com/@respawnandride"
+        tiktok_label = ttk.Label(
+            about_frame,
+            text=tiktok_link,
+            foreground="blue",
+            cursor="hand2"
+        )
+        tiktok_label.pack(pady=(0, 5))
+        tiktok_label.bind("<Button-1>", lambda e: self._open_url(tiktok_link))
+        
+        # Developer info
+        developer_label = ttk.Label(
+            about_frame,
+            text="Developer:",
+            font=("Arial", 10, "bold")
+        )
+        developer_label.pack(pady=(10, 0))
+        
+        github_link = "https://github.com/samscho98"
+        github_label = ttk.Label(
+            about_frame,
+            text=github_link,
+            foreground="blue",
+            cursor="hand2"
+        )
+        github_label.pack(pady=(0, 5))
+        github_label.bind("<Button-1>", lambda e: self._open_url(github_link))
         
         # Version and copyright
         version_label = ttk.Label(
@@ -196,6 +235,11 @@ Features:
         copyright_label.pack(pady=5)
         
         return about_frame
+
+    def _open_url(self, url):
+        """Open a URL in the default web browser"""
+        import webbrowser
+        webbrowser.open(url)
     
     def _download_single_video(self):
         """Download a single YouTube video"""
