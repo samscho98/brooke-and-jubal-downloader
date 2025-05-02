@@ -5,7 +5,7 @@ import platform
 import shutil
 
 def create_desktop_shortcuts(python_path):
-    """Create desktop shortcuts for the GUI application"""
+    """Create desktop shortcuts for the GUI application with hidden command prompt"""
     print("Creating desktop shortcuts...")
     
     home_dir = os.path.expanduser("~")
@@ -18,7 +18,12 @@ def create_desktop_shortcuts(python_path):
     app_dir = os.path.abspath(os.path.dirname(__file__))
     
     if platform.system() == "Windows":
-        # For Windows, create a .lnk file using VBScript
+        # First, create a VBS launcher that will hide the command window
+        vbs_launcher_path = os.path.join(app_dir, "launch_hidden.vbs")
+        with open(vbs_launcher_path, 'w') as f:
+            f.write('CreateObject("Wscript.Shell").Run """" & WScript.Arguments(0) & """", 0, False\n')
+        
+        # For Windows, create a .lnk shortcut to the VBS launcher
         try:
             # Check for icons in multiple locations
             icon_path = None
@@ -35,19 +40,21 @@ def create_desktop_shortcuts(python_path):
             
             if icon_path is None:
                 print("Icon file not found, shortcut will use default icon")
-                # Use the batch file as the icon source if no icon file found
                 icon_path = os.path.join(app_dir, "run_gui.bat")
             
             # Create a temporary VBScript file to create the shortcut
             vbs_script = os.path.join(app_dir, "create_shortcut.vbs")
             shortcut_path = os.path.join(desktop_dir, "YouTube Playlist Downloader.lnk")
-            target_path = os.path.join(app_dir, "run_gui.bat")
+            target_path = os.path.join(app_dir, "launch_hidden.vbs")
+            # The batch file is passed as an argument to the VBS launcher
+            batch_path = os.path.join(app_dir, "run_gui.bat")
             
             with open(vbs_script, 'w') as f:
                 f.write('Set oWS = WScript.CreateObject("WScript.Shell")\n')
                 f.write(f'sLinkFile = "{shortcut_path.replace("\\", "\\\\")}"\n')
                 f.write('Set oLink = oWS.CreateShortcut(sLinkFile)\n')
-                f.write(f'oLink.TargetPath = "{target_path.replace("\\", "\\\\")}"\n')
+                f.write(f'oLink.TargetPath = "wscript.exe"\n')
+                f.write(f'oLink.Arguments = """{target_path.replace("\\", "\\\\")}"" ""{batch_path.replace("\\", "\\\\")}"""\n')
                 f.write(f'oLink.WorkingDirectory = "{app_dir.replace("\\", "\\\\")}"\n')
                 f.write(f'oLink.IconLocation = "{icon_path.replace("\\", "\\\\")}"\n')
                 f.write('oLink.Save\n')
@@ -58,7 +65,7 @@ def create_desktop_shortcuts(python_path):
             # Remove the temporary script
             os.remove(vbs_script)
             
-            print(f"Created desktop shortcut with custom icon: {shortcut_path}")
+            print(f"Created desktop shortcut with hidden command prompt: {shortcut_path}")
             
         except Exception as e:
             print(f"Error creating Windows shortcut: {str(e)}")
