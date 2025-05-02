@@ -4,6 +4,118 @@ import sys
 import platform
 import shutil
 
+def create_desktop_shortcuts(python_path):
+    """Create desktop shortcuts for the GUI application"""
+    print("Creating desktop shortcuts...")
+    
+    home_dir = os.path.expanduser("~")
+    desktop_dir = os.path.join(home_dir, "Desktop")
+    
+    if not os.path.exists(desktop_dir):
+        print("Desktop directory not found, skipping shortcut creation")
+        return
+    
+    app_dir = os.path.abspath(os.path.dirname(__file__))
+    
+    if platform.system() == "Windows":
+        # For Windows, create a .lnk file using VBScript
+        try:
+            # Check for icons in multiple locations
+            icon_path = None
+            icon_locations = [
+                os.path.join(app_dir, "gui_app", "resources", "icon.ico"),
+                os.path.join(app_dir, "bin", "icon.ico")
+            ]
+            
+            for location in icon_locations:
+                if os.path.exists(location):
+                    icon_path = location
+                    print(f"Using icon from: {icon_path}")
+                    break
+            
+            if icon_path is None:
+                print("Icon file not found, shortcut will use default icon")
+                # Use the batch file as the icon source if no icon file found
+                icon_path = os.path.join(app_dir, "run_gui.bat")
+            
+            # Create a temporary VBScript file to create the shortcut
+            vbs_script = os.path.join(app_dir, "create_shortcut.vbs")
+            shortcut_path = os.path.join(desktop_dir, "YouTube Playlist Downloader.lnk")
+            target_path = os.path.join(app_dir, "run_gui.bat")
+            
+            with open(vbs_script, 'w') as f:
+                f.write('Set oWS = WScript.CreateObject("WScript.Shell")\n')
+                f.write(f'sLinkFile = "{shortcut_path.replace("\\", "\\\\")}"\n')
+                f.write('Set oLink = oWS.CreateShortcut(sLinkFile)\n')
+                f.write(f'oLink.TargetPath = "{target_path.replace("\\", "\\\\")}"\n')
+                f.write(f'oLink.WorkingDirectory = "{app_dir.replace("\\", "\\\\")}"\n')
+                f.write(f'oLink.IconLocation = "{icon_path.replace("\\", "\\\\")}"\n')
+                f.write('oLink.Save\n')
+            
+            # Execute the VBScript
+            subprocess.call(['cscript', '//NoLogo', vbs_script])
+            
+            # Remove the temporary script
+            os.remove(vbs_script)
+            
+            print(f"Created desktop shortcut with custom icon: {shortcut_path}")
+            
+        except Exception as e:
+            print(f"Error creating Windows shortcut: {str(e)}")
+            print("Creating simple batch file shortcut instead...")
+            
+            # Fallback to simple batch file if VBScript fails
+            try:
+                shortcut_path = os.path.join(desktop_dir, "YouTube Playlist Downloader.bat")
+                
+                with open(shortcut_path, 'w') as f:
+                    f.write('@echo off\n')
+                    f.write(f'cd /d "{app_dir}"\n')
+                    f.write('start "" "run_gui.bat"\n')
+                
+                print(f"Created desktop shortcut: {shortcut_path}")
+            except Exception as e2:
+                print(f"Error creating fallback shortcut: {str(e2)}")
+    else:
+        # Create a Linux/macOS .desktop file
+        try:
+            shortcut_path = os.path.join(desktop_dir, "youtube-playlist-downloader.desktop")
+            
+            # Check for an icon in multiple locations
+            icon_path = None
+            # For Linux we need PNG formats ideally
+            icon_locations = [
+                os.path.join(app_dir, "gui_app", "resources", "icon.png"),
+                os.path.join(app_dir, "bin", "icon.png"),
+                # Fallback to ICO if PNG not available
+                os.path.join(app_dir, "gui_app", "resources", "icon.ico"),
+                os.path.join(app_dir, "bin", "icon.ico")
+            ]
+            
+            for location in icon_locations:
+                if os.path.exists(location):
+                    icon_path = location
+                    break
+            
+            icon_line = f"Icon={icon_path}\n" if icon_path else ""
+            
+            with open(shortcut_path, 'w') as f:
+                f.write("[Desktop Entry]\n")
+                f.write("Type=Application\n")
+                f.write("Name=YouTube Playlist Downloader\n")
+                f.write(f"Exec={os.path.join(app_dir, 'run_gui.sh')}\n")
+                f.write(f"Path={app_dir}\n")
+                f.write("Terminal=false\n")
+                f.write(icon_line)
+                f.write("Categories=Audio;Video;Network;\n")
+            
+            # Make the desktop file executable
+            os.chmod(shortcut_path, 0o755)
+            
+            print(f"Created desktop shortcut: {shortcut_path}")
+        except Exception as e:
+            print(f"Error creating desktop shortcut: {str(e)}")
+
 def main():
     print("Installing YouTube Playlist Downloader...")
     
@@ -103,6 +215,9 @@ def main():
 
     # Create launcher batch/shell scripts
     create_launcher_scripts(python_path)
+
+    # Create desktop shortcuts
+    create_desktop_shortcuts(python_path)
     
     print("\nInstallation complete!")
     print("Run the program using:")
