@@ -2,6 +2,23 @@
 
 A simple application that downloads videos from YouTube playlists as audio files and keeps track of downloaded files to ensure your collection stays up to date. Designed to be easy to use for non-programmers.
 
+## ⚠️ Legal Disclaimer
+
+This software is provided for educational and personal use only. The developer(s) of this application:
+
+1. Do not endorse or encourage the unauthorized downloading of copyrighted content
+2. Are not responsible for how users choose to use this software
+3. Accept no liability for misuse of this software or any consequences thereof
+4. Make no guarantees regarding the legality of downloading specific content
+
+**Users are solely responsible for:**
+- Ensuring they have the right to download any content
+- Complying with YouTube's Terms of Service
+- Following all applicable copyright laws in their jurisdiction
+- Using downloaded content in accordance with fair use principles
+
+Remember that downloading copyrighted material without permission may be illegal in your country. This tool should only be used for downloading content that is either in the public domain, licensed under permissive terms, or for which you have obtained proper permission.
+
 ## 📋 Features
 
 - Download individual YouTube videos as audio files (MP3, WAV, OGG, M4A)

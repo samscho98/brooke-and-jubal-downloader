@@ -1,4 +1,3 @@
-# install_fix.py
 import os
 import subprocess
 import sys
