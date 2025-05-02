@@ -1,150 +1,131 @@
 # YouTube Playlist Downloader
 
-A Python console application that downloads videos from YouTube playlists as MP3 files and keeps track of downloaded files to ensure your collection stays up to date.
+A simple application that downloads videos from YouTube playlists as audio files and keeps track of downloaded files to ensure your collection stays up to date. Designed to be easy to use for non-programmers.
 
-## Features
+## 📋 Features
 
-- Download individual YouTube videos as MP3 files
-- Download entire YouTube playlists as MP3 files
+- Download individual YouTube videos as audio files (MP3, WAV, OGG, M4A)
+- Download entire YouTube playlists with automatic organization into folders
 - Track playlists to check for new videos at configurable intervals
 - Maintain a history of downloaded videos to avoid duplicates
-- Convert downloaded audio to different formats if needed
-- Command-line interface with menu-driven interaction
+- Convert audio to different formats with customizable bitrate
+- Normalize audio levels for consistent volume across tracks
+- Easy-to-use GUI for managing playlists and settings
+- Console interface for automation and advanced users
 
-## Installation
+## 🔧 Installation
 
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/yourusername/youtube-playlist-downloader.git
-   cd youtube-playlist-downloader
-   ```
+### Prerequisites
 
-2. Create a virtual environment and activate it:
-   ```bash
-   # On Windows
-   python -m venv venv
-   venv\Scripts\activate
+1. **Python**: This application requires Python 3.8 or newer
+   - Windows: [Download Python from python.org](https://www.python.org/downloads/windows/)
+   - macOS: [Download Python from python.org](https://www.python.org/downloads/macos/)
+   - Linux: Most distributions come with Python installed, or use your package manager
 
-   # On macOS/Linux
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
+2. **FFmpeg**: Required for audio conversion
+   - Windows: The installer will try to download and configure FFmpeg automatically
+   - macOS: `brew install ffmpeg` (requires [Homebrew](https://brew.sh/))
+   - Linux: `sudo apt install ffmpeg` or equivalent for your distribution
 
-3. Install the dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Installation Steps
 
-4. Install FFmpeg (required for audio conversion):
-   - **Windows**: Download from [FFmpeg.org](https://ffmpeg.org/download.html) and add to PATH
-   - **macOS**: `brew install ffmpeg`
-   - **Linux**: `sudo apt install ffmpeg` or equivalent
+1. Download this repository:
+   - Click the green "Code" button at the top of the page
+   - Select "Download ZIP"
+   - Extract the ZIP file to a folder on your computer
 
-## Usage
+2. Run the installer script:
+   - **Windows**: Double-click the `installer.py` file or right-click and select "Open with Python"
+   - **macOS/Linux**: Open a terminal in the extracted folder and run:
+     ```bash
+     python3 installer.py
+     ```
 
-### Running the application
+3. The installer will:
+   - Create a virtual environment to isolate the application
+   - Install all required dependencies
+   - Set up FFmpeg for audio processing
+   - Create launcher scripts for easy startup
+
+## 🚀 Using the Application
+
+### Starting the Application
+
+After installation, you can start the application using:
+
+- **Windows**:
+  - GUI: Double-click `run_gui.bat`
+  - Console: Double-click `run_console.bat`
+
+- **macOS/Linux**:
+  - GUI: Open a terminal and run `./run_gui.sh`
+  - Console: Open a terminal and run `./run_console.sh`
+
+### GUI Interface
+
+The GUI provides a user-friendly way to:
+- Add and manage YouTube playlists
+- Configure audio settings (format, bitrate, etc.)
+- Download individual videos
+- Update all tracked playlists at once
+
+### Console Interface
+
+The console provides more advanced functionality:
 
 ```bash
-# Run with interactive menu
-python main.py
-
 # Download a single video
-python main.py --download "https://www.youtube.com/watch?v=VIDEO_ID"
+run_console.bat --download "https://www.youtube.com/watch?v=VIDEO_ID"
 
 # Download a playlist
-python main.py --download "https://www.youtube.com/playlist?list=PLAYLIST_ID"
+run_console.bat --download "https://www.youtube.com/playlist?list=PLAYLIST_ID"
 
-# Add a playlist to track
-python main.py --add-playlist "https://www.youtube.com/playlist?list=PLAYLIST_ID"
+# Add a playlist to track for updates
+run_console.bat --add-playlist "https://www.youtube.com/playlist?list=PLAYLIST_ID"
 
 # List tracked playlists
-python main.py --list-playlists
+run_console.bat --list-playlists
 
-# Update all tracked playlists
-python main.py --update-all
-
-# Remove a playlist from tracking
-python main.py --remove-playlist "https://www.youtube.com/playlist?list=PLAYLIST_ID"
+# Update all tracked playlists (download new videos)
+run_console.bat --update-all
 ```
 
-### Command-line options
+Replace `.bat` with `.sh` on macOS/Linux.
 
-```
-usage: main.py [-h] [--download URL] [--add-playlist URL] [--list-playlists]
-               [--update-all] [--remove-playlist URL] [--config FILE]
-               [--output-dir DIR] [--check-interval HOURS]
-               [--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
-               [--log-file FILE]
+## ⚙️ Configuration
 
-options:
-  -h, --help            Show this help message and exit
-  --download URL, -d URL
-                        Download a YouTube video or playlist
-  --add-playlist URL, -a URL
-                        Add a playlist to track
-  --list-playlists, -l  List all tracked playlists
-  --update-all, -u      Update all tracked playlists
-  --remove-playlist URL, -r URL
-                        Remove a playlist from tracking
-  --config FILE, -c FILE
-                        Path to configuration file (default: config.ini)
-  --output-dir DIR, -o DIR
-                        Directory to save downloaded files
-  --check-interval HOURS
-                        How often to check for updates (in hours)
-  --log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
-                        Set logging level
-  --log-file FILE       File to log to (in addition to console)
-```
-
-## Configuration
-
-The application uses a configuration file (`config.ini`) to store settings. This file is automatically created with default values on first run, or you can create it manually.
-
-Example configuration:
+The application uses a configuration file (`config.ini`) to store settings. You can edit this through the GUI or directly in a text editor:
 
 ```ini
 [general]
-output_directory = data/audio
-check_interval = 24
-max_downloads = 10
+output_directory = data/audio  # Where audio files are saved
+check_interval = 24            # Hours between checks for new videos
+max_downloads = 10             # Max videos to download per run
 
 [audio]
-format = mp3
-bitrate = 192k
-normalize_audio = True
-target_level = -18.0
+format = mp3                   # Audio format (mp3, wav, m4a, ogg)
+bitrate = 192k                 # Audio quality
+normalize_audio = True         # Balance volume levels
+target_level = -18.0           # Target volume level in dB
 
 [logging]
-level = INFO
-file = app.log
-console = True
+level = INFO                   # Log detail level
+file = app.log                 # Log file location
+console = True                 # Show logs in console
 ```
 
-## Project Structure
+## 🔍 Troubleshooting
 
-```
-youtube-playlist-downloader/
-├── downloader/
-│   ├── __init__.py
-│   ├── converter.py
-│   ├── tracker.py
-│   └── youtube.py
-├── utils/
-│   ├── __init__.py
-│   ├── config_handler.py
-│   └── file_manager.py
-├── .gitignore
-├── README.md
-├── main.py
-└── requirements.txt
-```
+- **FFmpeg errors**: If audio conversion fails, ensure FFmpeg is installed correctly
+- **Download errors**: Some videos may be restricted and cannot be downloaded
+- **GUI doesn't start**: Ensure tkinter is installed with Python
+- **Playlist errors**: Make sure playlist URLs are correct and playlists are not private
 
-## License
+## 📜 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Acknowledgments
+## 🙏 Acknowledgments
 
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) - YouTube video downloader
 - [pydub](https://github.com/jiaaro/pydub) - Audio processing
