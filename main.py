@@ -274,14 +274,6 @@ def main() -> int:
     logging.info(f"Starting application with config file: {args.config}")
     logging.info(f"Log level: {log_level}")
     logging.info(f"Log file: {log_file}")
-
-
-    # Add at the beginning of main() after setup_logging
-    logging.debug("This is a DEBUG message")
-    logging.info("This is an INFO message")
-    logging.warning("This is a WARNING message")
-    logging.error("This is an ERROR message") 
-    logging.critical("This is a CRITICAL message")
     
     config.save_config()
     
