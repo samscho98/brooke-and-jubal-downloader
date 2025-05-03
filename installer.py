@@ -138,22 +138,20 @@ def main():
     if platform.system() == "Windows":
         scripts_dir = os.path.join("venv", "Scripts")
         python_path = os.path.join(scripts_dir, "python.exe")
-        pip_path = os.path.join(scripts_dir, "pip.exe")
         site_packages = os.path.join("venv", "Lib", "site-packages")
     else:
         scripts_dir = os.path.join("venv", "bin")
         python_path = os.path.join(scripts_dir, "python")
-        pip_path = os.path.join(scripts_dir, "pip")
         # Account for different Python versions in path
         python_version = subprocess.check_output([python_path, "-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"], 
                                                universal_newlines=True).strip()
         site_packages = os.path.join("venv", "lib", f"python{python_version}", "site-packages")
     
-    # Upgrade pip using the Python executable
+    # Upgrade pip using the Python executable - UPDATED to use python -m pip
     print("Upgrading pip...")
     subprocess.check_call([python_path, "-m", "pip", "install", "--upgrade", "pip"])
     
-    # Install requirements
+    # Install requirements - UPDATED to use python -m pip
     print("Installing dependencies...")
     subprocess.check_call([python_path, "-m", "pip", "install", "-r", "requirements.txt"])
     

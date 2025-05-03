@@ -280,8 +280,8 @@ def main() -> int:
     # Initialize components
     output_dir = config.get("general", "output_directory")
     file_manager = FileManager(output_dir)
-    downloader = YouTubeDownloader(output_dir, config)  # <-- Pass config here
-    converter = AudioConverter()  # <-- Add this line
+    downloader = YouTubeDownloader(output_dir, config)
+    converter = AudioConverter()
     tracker = DownloadTracker(
         history_file="gui_app/download_history.json",
         playlists_file="gui_app/playlists.json"
