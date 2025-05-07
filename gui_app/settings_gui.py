@@ -166,12 +166,36 @@ Supported formats: MP3, WAV, M4A, OGG
         return video_frame
         
     def _create_about_tab(self):
-        """Create the About tab"""
-        about_frame = ttk.Frame(self.notebook, padding="20")
+        """Create the About tab with scrollable content"""
+        about_frame = ttk.Frame(self.notebook, padding="10")
         
+        # Create a canvas with scrollbar for scrollable content
+        canvas_frame = ttk.Frame(about_frame)
+        canvas_frame.pack(fill="both", expand=True)
+        
+        canvas = tk.Canvas(canvas_frame, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(canvas_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        # Configure the scrollable frame to expand to canvas width
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        # Set a fixed width for the content to keep it centered
+        content_width = 550  # Adjust this value as needed
+        canvas.configure(width=content_width, yscrollcommand=scrollbar.set)
+        canvas.create_window((content_width/2, 0), window=scrollable_frame, anchor="n")
+        
+        # Pack the scrolling components with minimal spacing
+        canvas.pack(side="left", fill="both", expand=True, padx=(10, 0))
+        scrollbar.pack(side="left", fill="y", padx=(0, 10))
+        
+        # Add content to the scrollable frame
         # App title
         title_label = ttk.Label(
-            about_frame, 
+            scrollable_frame, 
             text="YouTube Playlist Downloader", 
             font=("Arial", 16, "bold")
         )
@@ -179,7 +203,7 @@ Supported formats: MP3, WAV, M4A, OGG
         
         # Version info
         version_label = ttk.Label(
-            about_frame,
+            scrollable_frame,
             text=f"Version {__version__}",
             font=("Arial", 10)
         )
@@ -193,7 +217,7 @@ Supported formats: MP3, WAV, M4A, OGG
     This GUI is for managing the settings and playlists. 
     Use the 'Run Downloader (Console)' button to launch the main application.
         """
-        desc_label = ttk.Label(about_frame, text=description, justify="center", wraplength=500)
+        desc_label = ttk.Label(scrollable_frame, text=description, justify="center", wraplength=500)
         desc_label.pack(pady=10)
         
         # Features
@@ -209,12 +233,12 @@ Supported formats: MP3, WAV, M4A, OGG
     - Powerful command-line interface for automation
     - Automatic updates from GitHub
         """
-        features_label = ttk.Label(about_frame, text=features, justify="left", wraplength=500)
+        features_label = ttk.Label(scrollable_frame, text=features, justify="left", wraplength=500)
         features_label.pack(pady=10)
         
         # Created for
         created_for_label = ttk.Label(
-            about_frame,
+            scrollable_frame,
             text="Created for:",
             font=("Arial", 10, "bold")
         )
@@ -222,7 +246,7 @@ Supported formats: MP3, WAV, M4A, OGG
         
         tiktok_link = "https://www.tiktok.com/@respawnandride"
         tiktok_label = ttk.Label(
-            about_frame,
+            scrollable_frame,
             text=tiktok_link,
             foreground="blue",
             cursor="hand2"
@@ -232,7 +256,7 @@ Supported formats: MP3, WAV, M4A, OGG
         
         # Developer info
         developer_label = ttk.Label(
-            about_frame,
+            scrollable_frame,
             text="Developer:",
             font=("Arial", 10, "bold")
         )
@@ -240,7 +264,7 @@ Supported formats: MP3, WAV, M4A, OGG
         
         github_link = f"https://github.com/{REPO_OWNER}"
         github_label = ttk.Label(
-            about_frame,
+            scrollable_frame,
             text=github_link,
             foreground="blue",
             cursor="hand2"
@@ -250,7 +274,7 @@ Supported formats: MP3, WAV, M4A, OGG
         
         # Repository link
         repo_label = ttk.Label(
-            about_frame,
+            scrollable_frame,
             text="Project Repository:",
             font=("Arial", 10, "bold")
         )
@@ -258,7 +282,7 @@ Supported formats: MP3, WAV, M4A, OGG
         
         repo_link = f"https://github.com/{REPO_OWNER}/{REPO_NAME}"
         repo_link_label = ttk.Label(
-            about_frame,
+            scrollable_frame,
             text=repo_link,
             foreground="blue",
             cursor="hand2"
@@ -268,11 +292,24 @@ Supported formats: MP3, WAV, M4A, OGG
         
         # Copyright label
         copyright_label = ttk.Label(
-            about_frame, 
+            scrollable_frame, 
             text="Copyright © 2025", 
             font=("Arial", 10)
         )
         copyright_label.pack(pady=5)
+        
+        # Add mouse wheel binding for scrolling
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        # Platform-specific mouse wheel scrolling
+        if sys.platform.startswith('win'):
+            # Windows
+            canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        else:
+            # Linux and macOS
+            canvas.bind_all("<Button-4>", lambda event: canvas.yview_scroll(-1, "units"))
+            canvas.bind_all("<Button-5>", lambda event: canvas.yview_scroll(1, "units"))
         
         return about_frame
 
