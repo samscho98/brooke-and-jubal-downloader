@@ -18,13 +18,23 @@ parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
+# Import version information
+try:
+    from version import __version__, REPO_OWNER, REPO_NAME
+except ImportError:
+    __version__ = "1.0.0"
+    REPO_OWNER = "samscho98"
+    REPO_NAME = "youtube-playlist-downloader"
+
 from utils.config_handler import ConfigHandler
+from utils.updater import Updater
 from downloader.tracker import DownloadTracker
 from downloader.youtube import YouTubeDownloader
 
 # Import GUI components directly from their modules to avoid circular imports
 from gui_app.components.playlist_manager import PlaylistPanel
 from gui_app.components.settings_panel import SettingsPanel
+from gui_app.components.updater_panel import UpdaterPanel
 
 class PlaylistDownloaderGUI:
     """GUI application for managing YouTube Playlist Downloader settings"""
@@ -57,11 +67,13 @@ class PlaylistDownloaderGUI:
         self.playlists_tab = PlaylistPanel(self.notebook, self.tracker)
         self.single_video_tab = self._create_single_video_tab()
         self.settings_tab = SettingsPanel(self.notebook, self.config)
+        self.update_tab = UpdaterPanel(self.notebook, __version__, REPO_OWNER, REPO_NAME)
         self.about_tab = self._create_about_tab()
         
         self.notebook.add(self.playlists_tab, text="Playlists")
         self.notebook.add(self.single_video_tab, text="Download Video")
         self.notebook.add(self.settings_tab, text="Settings")
+        self.notebook.add(self.update_tab, text="Updates")
         self.notebook.add(self.about_tab, text="About")
         
         # Create button frame at the bottom
@@ -83,6 +95,14 @@ class PlaylistDownloaderGUI:
             command=self._save_settings
         )
         self.save_button.pack(side=tk.RIGHT, padx=5)
+        
+        # Add check for updates button
+        self.update_button = ttk.Button(
+            self.button_frame,
+            text="Check for Updates",
+            command=self._check_for_updates
+        )
+        self.update_button.pack(side=tk.LEFT, padx=5)
         
     def _create_single_video_tab(self):
         """Create the single video download tab"""
@@ -157,6 +177,14 @@ Supported formats: MP3, WAV, M4A, OGG
         )
         title_label.pack(pady=10)
         
+        # Version info
+        version_label = ttk.Label(
+            about_frame,
+            text=f"Version {__version__}",
+            font=("Arial", 10)
+        )
+        version_label.pack(pady=(0, 10))
+        
         # Description
         description = """
     A Python application that downloads videos from YouTube playlists as audio files 
@@ -179,6 +207,7 @@ Supported formats: MP3, WAV, M4A, OGG
     - Normalize audio levels for consistent volume across tracks
     - Easy-to-use GUI for managing playlists and settings
     - Powerful command-line interface for automation
+    - Automatic updates from GitHub
         """
         features_label = ttk.Label(about_frame, text=features, justify="left", wraplength=500)
         features_label.pack(pady=10)
@@ -209,7 +238,7 @@ Supported formats: MP3, WAV, M4A, OGG
         )
         developer_label.pack(pady=(10, 0))
         
-        github_link = "https://github.com/samscho98"
+        github_link = f"https://github.com/{REPO_OWNER}"
         github_label = ttk.Label(
             about_frame,
             text=github_link,
@@ -219,14 +248,25 @@ Supported formats: MP3, WAV, M4A, OGG
         github_label.pack(pady=(0, 5))
         github_label.bind("<Button-1>", lambda e: self._open_url(github_link))
         
-        # Version and copyright
-        version_label = ttk.Label(
-            about_frame, 
-            text="Version 1.0.0", 
-            font=("Arial", 10)
+        # Repository link
+        repo_label = ttk.Label(
+            about_frame,
+            text="Project Repository:",
+            font=("Arial", 10, "bold")
         )
-        version_label.pack(pady=5)
+        repo_label.pack(pady=(10, 0))
         
+        repo_link = f"https://github.com/{REPO_OWNER}/{REPO_NAME}"
+        repo_link_label = ttk.Label(
+            about_frame,
+            text=repo_link,
+            foreground="blue",
+            cursor="hand2"
+        )
+        repo_link_label.pack(pady=(0, 5))
+        repo_link_label.bind("<Button-1>", lambda e: self._open_url(repo_link))
+        
+        # Copyright label
         copyright_label = ttk.Label(
             about_frame, 
             text="Copyright © 2025", 
@@ -428,6 +468,14 @@ Supported formats: MP3, WAV, M4A, OGG
             
         except Exception as e:
             messagebox.showerror("Error", f"Failed to launch downloader: {str(e)}")
+    
+    def _check_for_updates(self):
+        """Check for application updates and switch to update tab"""
+        # Switch to the update tab
+        self.notebook.select(self.update_tab)
+        
+        # Trigger the update check
+        self.update_tab.check_for_updates()
 
 def main():
     """Main entry point for the GUI application"""
