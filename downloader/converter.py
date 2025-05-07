@@ -10,25 +10,39 @@ from pydub import AudioSegment
 
 logger = logging.getLogger(__name__)
 
-# Ensure FFmpeg is properly set to use the bundled version
 def _configure_ffmpeg():
     """Configure FFmpeg path for audio processing"""
     try:
         # Try to find the bundled FFmpeg
         app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        ffmpeg_path = os.path.join(app_dir, "bin", "ffmpeg.exe" if os.name == 'nt' else "ffmpeg")
+        bin_dir = os.path.join(app_dir, "bin")
+        ffmpeg_path = os.path.join(bin_dir, "ffmpeg.exe" if os.name == 'nt' else "ffmpeg")
         
         if os.path.exists(ffmpeg_path):
             # Configure pydub to use our FFmpeg
             AudioSegment.converter = ffmpeg_path
             logger.info(f"Using bundled FFmpeg: {ffmpeg_path}")
+            
+            # Make sure it's executable on Unix-like systems
+            if os.name == 'posix':
+                import stat
+                current_permissions = os.stat(ffmpeg_path).st_mode
+                os.chmod(ffmpeg_path, current_permissions | stat.S_IEXEC)
+                
+            # Add bin directory to PATH environment for yt-dlp to find it
+            os.environ["PATH"] = bin_dir + os.pathsep + os.environ.get("PATH", "")
+            
+            # Return the configured path for other components to use
+            return ffmpeg_path
         else:
-            logger.warning("Bundled FFmpeg not found, using system FFmpeg.")
+            logger.warning(f"Bundled FFmpeg not found at {ffmpeg_path}, using system FFmpeg.")
+            return None
     except Exception as e:
         logger.error(f"Error configuring FFmpeg: {str(e)}")
+        return None
 
-# Call the configuration function
-_configure_ffmpeg()
+# Call the configuration function and store the result
+FFMPEG_PATH = _configure_ffmpeg()
 
 class AudioConverter:
     """Class to handle audio conversion operations."""

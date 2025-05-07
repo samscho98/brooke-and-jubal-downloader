@@ -30,6 +30,13 @@ class YouTubeDownloader:
         else:
             self.config = config
         
+        # Explicitly set FFmpeg path for yt-dlp
+        from downloader.converter import FFMPEG_PATH
+        if FFMPEG_PATH:
+            self.ffmpeg_location = FFMPEG_PATH
+        else:
+            self.ffmpeg_location = None
+        
     def _ensure_output_dir_exists(self):
         """Create the output directory if it doesn't exist."""
         if not os.path.exists(self.output_dir):
@@ -71,7 +78,8 @@ class YouTubeDownloader:
                     os.makedirs(playlist_dir, exist_ok=True)
                     logger.info(f"Created playlist directory: {playlist_dir}")
                 output_dir = playlist_dir
-                
+            
+            # Define options - this was missing in the original code
             options = {
                 'format': 'bestaudio/best' if audio_only else 'best',
                 'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
@@ -82,6 +90,10 @@ class YouTubeDownloader:
                 'default_search': 'auto',
                 'source_address': '0.0.0.0',
             }
+            
+            # Add FFmpeg location if available
+            if hasattr(self, 'ffmpeg_location') and self.ffmpeg_location:
+                options['ffmpeg_location'] = self.ffmpeg_location
             
             if audio_only:
                 options['postprocessors'] = [{

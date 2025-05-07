@@ -242,7 +242,7 @@ Supported formats: MP3, WAV, M4A, OGG
         webbrowser.open(url)
     
     def _download_single_video(self):
-        """Download a single YouTube video"""
+        """Download a single YouTube video with improved logging"""
         url = self.video_url_var.get().strip()
         
         if not url:
@@ -253,45 +253,117 @@ Supported formats: MP3, WAV, M4A, OGG
             messagebox.showerror("Error", "Invalid YouTube URL")
             return
         
-        # Ask for confirmation
-        if not messagebox.askyesno("Confirm", f"Download video:\n{url}?"):
-            return
+        # Get the logger
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Configure the root logger if not already configured
+        if not logging.getLogger().handlers:
+            log_level = self.config.get("logging", "level", "INFO")
+            log_file = self.config.get("logging", "file", "app.log")
+            log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
             
+            # Set numeric level
+            numeric_level = getattr(logging, log_level.upper(), logging.INFO)
+            
+            # Create handlers
+            handlers = []
+            if log_file:
+                try:
+                    handlers.append(logging.FileHandler(log_file))
+                    logger.info(f"Log file set to: {log_file}")
+                except Exception as e:
+                    logger.error(f"Could not create log file handler: {str(e)}")
+            
+            # Add console handler
+            if self.config.getboolean("logging", "console", True):
+                handlers.append(logging.StreamHandler())
+            
+            # Configure logging
+            logging.basicConfig(
+                level=numeric_level,
+                format=log_format,
+                handlers=handlers
+            )
+        
+        # Log the start of the download
+        logger.info(f"Starting download for video: {url}")
         self.video_status_var.set("Downloading video...")
         
+        # Ask for confirmation
+        if not messagebox.askyesno("Confirm", f"Download video:\n{url}?"):
+            logger.info("Download cancelled by user")
+            self.video_status_var.set("Download cancelled")
+            return
+            
         # Get audio format from settings
         audio_format = self.video_format_var.get()
+        logger.info(f"Selected audio format: {audio_format}")
         
         def download_thread():
             try:
                 # Update the format in config
                 self.config.set("audio", "format", audio_format)
+                logger.info(f"Updating config with format: {audio_format}")
+                
+                # Set log level to DEBUG temporarily for more detailed logs
+                previous_level = logging.getLogger().level
+                logging.getLogger().setLevel(logging.DEBUG)
+                
+                # Log thread start
+                logger.debug(f"Download thread started for URL: {url}")
                 
                 # Run the download
+                logger.info(f"Starting download using YouTubeDownloader for URL: {url}")
                 result = self.downloader.download_video(url, audio_only=True)
+                
+                # Restore previous log level
+                logging.getLogger().setLevel(previous_level)
                 
                 # Update UI in the main thread
                 self.root.after(100, lambda: self._update_download_status(result))
                 
             except Exception as e:
+                # Log the error
+                logger.error(f"Error during download: {str(e)}", exc_info=True)
+                
+                # Restore previous log level
+                logging.getLogger().setLevel(previous_level)
+                
                 # Update UI in the main thread
                 error_msg = str(e)
                 self.root.after(100, lambda: self._update_download_status(None, error_msg))
             
         # Start the download thread
+        import threading
         thread = threading.Thread(target=download_thread)
         thread.daemon = True
         thread.start()
-    
+        logger.info("Download thread launched")
+        
     def _update_download_status(self, result, error=None):
-        """Update the UI after a download completes"""
+        """Update the UI after a download completes with improved logging"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
         if result:
+            logger.info(f"Download completed successfully: {result}")
             self.video_status_var.set("Download completed")
             messagebox.showinfo("Success", f"Video downloaded to:\n{result}")
             self.video_url_var.set("")  # Clear the URL field
         else:
+            logger.error(f"Download failed: {error or 'Unknown error'}")
             self.video_status_var.set("Download failed")
-            messagebox.showerror("Error", f"Failed to download video: {error or 'Unknown error'}")
+            
+            # Create a more detailed error message
+            error_details = f"Failed to download video: {error or 'Unknown error'}"
+            logger.error(error_details)
+            
+            # Log file location for user reference
+            log_file = self.config.get("logging", "file", "app.log")
+            error_message = f"{error_details}\n\nMore details can be found in the log file: {log_file}"
+            
+            messagebox.showerror("Error", error_message)
         
     def _save_settings(self):
         """Save settings to config file"""

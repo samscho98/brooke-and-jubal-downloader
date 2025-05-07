@@ -108,10 +108,21 @@ class SettingsPanel(ttk.Frame):
         # Status frame at the bottom
         status_frame = ttk.LabelFrame(self, text="Settings Status")
         status_frame.grid(row=row, column=0, columnspan=3, sticky=tk.EW, padx=5, pady=10)
+        row += 1
         
         self.status_var = tk.StringVar(value="Ready")
         status_label = ttk.Label(status_frame, textvariable=self.status_var)
         status_label.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Add a save button directly to the settings panel
+        save_button_frame = ttk.Frame(self)
+        save_button_frame.grid(row=row, column=0, columnspan=3, sticky=tk.E, padx=5, pady=10)
+        
+        ttk.Button(
+            save_button_frame, 
+            text="Save Settings",
+            command=self.save_settings
+        ).pack(side=tk.RIGHT, padx=5)
         
     def _toggle_normalize(self):
         """Toggle the target level entry based on normalize audio checkbox"""
@@ -190,6 +201,7 @@ class SettingsPanel(ttk.Frame):
             
             if success:
                 self.status_var.set("Settings saved successfully")
+                messagebox.showinfo("Success", "Settings saved successfully")
                 return True
             else:
                 self.status_var.set("Failed to save settings")

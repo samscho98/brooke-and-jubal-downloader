@@ -4,6 +4,92 @@ import sys
 import platform
 import shutil
 
+def setup_ffmpeg(bin_dir):
+    """Set up FFmpeg in the bin directory"""
+    print("Setting up FFmpeg...")
+    
+    ffmpeg_exe = os.path.join(bin_dir, "ffmpeg.exe" if platform.system() == "Windows" else "ffmpeg")
+    
+    # Check if FFmpeg is already in the bin directory
+    if os.path.exists(ffmpeg_exe):
+        print(f"Found existing FFmpeg: {ffmpeg_exe}")
+        
+        # Make sure it's executable on Unix systems
+        if platform.system() != "Windows":
+            os.chmod(ffmpeg_exe, 0o755)
+        
+        return True
+    
+    # If no FFmpeg is found, try to download it
+    try:
+        if platform.system() == "Windows":
+            # Download FFmpeg for Windows
+            import urllib.request
+            print("Downloading FFmpeg for Windows...")
+            ffmpeg_url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+            zip_file = os.path.join(bin_dir, "ffmpeg.zip")
+            
+            # Create a progress indicator
+            def report_progress(block_num, block_size, total_size):
+                downloaded = block_num * block_size
+                percent = min(int(downloaded * 100 / total_size), 100)
+                print(f"\rProgress: {percent}% ({downloaded}/{total_size} bytes)", end="", flush=True)
+            
+            # Download the file
+            urllib.request.urlretrieve(ffmpeg_url, zip_file, reporthook=report_progress)
+            print("\nExtracting FFmpeg...")
+            
+            # Extract the file
+            import zipfile
+            with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+                # List files in the archive
+                file_list = zip_ref.namelist()
+                
+                # Find the ffmpeg.exe file
+                ffmpeg_in_zip = next((f for f in file_list if f.endswith("ffmpeg.exe")), None)
+                
+                if ffmpeg_in_zip:
+                    # Extract only the ffmpeg.exe file
+                    with zip_ref.open(ffmpeg_in_zip) as source:
+                        with open(ffmpeg_exe, 'wb') as target:
+                            target.write(source.read())
+                    
+                    print(f"FFmpeg extracted to: {ffmpeg_exe}")
+                else:
+                    print("Could not find ffmpeg.exe in the zip file")
+                    return False
+            
+            # Remove the downloaded zip file
+            os.remove(zip_file)
+            
+            return os.path.exists(ffmpeg_exe)
+        else:
+            # For Linux/macOS, instruct the user to install FFmpeg
+            print("Please install FFmpeg using your package manager:")
+            if platform.system() == "Darwin":  # macOS
+                print("  brew install ffmpeg")
+            else:  # Linux
+                print("  sudo apt install ffmpeg  # Debian/Ubuntu")
+                print("  sudo yum install ffmpeg  # CentOS/RHEL")
+            
+            # Try to copy from system path as a fallback
+            try:
+                import shutil
+                system_ffmpeg = shutil.which("ffmpeg")
+                if system_ffmpeg:
+                    shutil.copy2(system_ffmpeg, ffmpeg_exe)
+                    os.chmod(ffmpeg_exe, 0o755)
+                    print(f"Copied system FFmpeg to: {ffmpeg_exe}")
+                    return True
+            except Exception as e:
+                print(f"Error copying system FFmpeg: {e}")
+            
+            return False
+    
+    except Exception as e:
+        print(f"Error setting up FFmpeg: {e}")
+        return False
+
 def create_desktop_shortcuts(python_path):
     """Create desktop shortcuts for the GUI application with hidden command prompt"""
     print("Creating desktop shortcuts...")
@@ -138,20 +224,22 @@ def main():
     if platform.system() == "Windows":
         scripts_dir = os.path.join("venv", "Scripts")
         python_path = os.path.join(scripts_dir, "python.exe")
+        pip_path = os.path.join(scripts_dir, "pip.exe")
         site_packages = os.path.join("venv", "Lib", "site-packages")
     else:
         scripts_dir = os.path.join("venv", "bin")
         python_path = os.path.join(scripts_dir, "python")
+        pip_path = os.path.join(scripts_dir, "pip")
         # Account for different Python versions in path
         python_version = subprocess.check_output([python_path, "-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"], 
                                                universal_newlines=True).strip()
         site_packages = os.path.join("venv", "lib", f"python{python_version}", "site-packages")
     
-    # Upgrade pip using the Python executable - UPDATED to use python -m pip
+    # Upgrade pip using the Python executable
     print("Upgrading pip...")
     subprocess.check_call([python_path, "-m", "pip", "install", "--upgrade", "pip"])
     
-    # Install requirements - UPDATED to use python -m pip
+    # Install requirements
     print("Installing dependencies...")
     subprocess.check_call([python_path, "-m", "pip", "install", "-r", "requirements.txt"])
     
@@ -167,6 +255,12 @@ def main():
     if not os.path.exists(bin_dir):
         os.makedirs(bin_dir)
     
+    # Setup FFmpeg
+    ffmpeg_setup = setup_ffmpeg(bin_dir)
+    if not ffmpeg_setup:
+        print("\nWARNING: Could not set up FFmpeg automatically.")
+        print("Please manually download FFmpeg and place it in the 'bin' directory.")
+
     ffmpeg_exe = os.path.join(bin_dir, "ffmpeg.exe" if platform.system() == "Windows" else "ffmpeg")
     
     if os.path.exists(ffmpeg_exe):
