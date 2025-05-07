@@ -3,6 +3,8 @@
 YouTube Playlist Downloader Application.
 Downloads videos from YouTube playlists as MP3 files and keeps track of the collection.
 """
+
+# Import necessary modules
 import os
 import sys
 import logging
