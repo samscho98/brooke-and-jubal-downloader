@@ -17,6 +17,9 @@ livestream. The goal is to maximize viewer engagement and retention by leveragin
 - `youtube_views` (int)
 - `youtube_comments` (int)
 - `video_duration_minutes` (float)
+- **`upload_date` (date) — when video was published to YouTube** (NEW)
+- **`is_new_release` (boolean) — flag for content published within last 14 days** (NEW)
+- **`days_since_release` (int) — number of days since upload** (NEW)
 
 ### Livestream Performance:
 - `stream_chat_messages` (int) — messages in chat during video play
@@ -57,6 +60,21 @@ engagement_boost = 1 + (youtube_comments / youtube_views)
 - youtube_comments = 1,200
 - engagement_boost = 1 + (1200 / 500000) = 1.0024
 - base_score = log10(500000) * 1.0024 ≈ 5.7
+
+#### NEW: New Video Handling
+For new or recently released videos with low view counts but high potential:
+```
+if youtube_views < 10000 and is_new_release:  // Released in last 14 days
+    // Provide a "boost" to give new content a fair chance
+    min_score = 3.5  // Equivalent to about 3,000+ views
+    base_score = max(base_score, min_score)
+    
+    // Add "freshness bonus" to prioritize newer content
+    freshness_bonus = (14 - days_since_release) * 0.1  // Up to +1.4 bonus
+    base_score += freshness_bonus
+```
+
+This adjustment ensures new videos get fair exposure despite not having accumulated views yet, preventing the algorithm from only selecting older, established content.
 
 ### 2. NEW: Loyalty Multiplier
 ```
@@ -216,6 +234,12 @@ Introduce and evaluate new or less-common radio segments without negatively impa
 - Play 1 in every 10 segments from a less-known or new playlist.
 - Schedule these tests during low or medium traffic periods.
 - Inform the audience (if possible) that it's a "special segment" or test.
+- **NEW: Include a "new release spotlight" segment in each stream** to ensure fresh content gets exposure regardless of its initial metrics
+- **NEW: For promising new videos with few views, use a "potential-based" scoring approach:**
+```
+potential_score = (engagement_rate * 5000) + freshness_bonus
+```
+  Where engagement_rate = (youtube_comments / youtube_views) and is typically higher for quality new content even with fewer absolute views
 
 #### 2. NEW: Loyalty-Aware Exploration Rate
 ```
