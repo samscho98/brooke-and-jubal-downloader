@@ -7,6 +7,7 @@ import json
 import logging
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -190,7 +191,8 @@ class DownloadTracker:
         return False
     
     def add_downloaded_video(self, video_id: str, playlist_id: str, 
-                           title: str, file_path: str) -> bool:
+                           title: str, file_path: str, 
+                           view_count: int = 0, upload_date: Optional[str] = None) -> bool:
         """
         Add a downloaded video to the history.
         
@@ -199,28 +201,123 @@ class DownloadTracker:
             playlist_id: YouTube playlist ID
             title: Title of the video
             file_path: Path to the downloaded file
+            view_count: Number of views the video has
+            upload_date: Date the video was uploaded (YYYYMMDD format)
             
         Returns:
             True if added successfully, False otherwise
         """
+        now = datetime.now().isoformat()
+        
         if video_id in self.download_history["videos"]:
             # Update existing record
             self.download_history["videos"][video_id]["playlists"].append(playlist_id)
             self.download_history["videos"][video_id]["playlists"] = list(set(
                 self.download_history["videos"][video_id]["playlists"]
             ))
-            self.download_history["videos"][video_id]["last_updated"] = datetime.now().isoformat()
+            self.download_history["videos"][video_id]["last_updated"] = now
+            
+            # Update view count if provided
+            if view_count > 0:
+                self.download_history["videos"][video_id]["view_count"] = view_count
+                self.download_history["videos"][video_id]["view_count_updated"] = now
+                
+            # Update file path if it's changed
+            if file_path and file_path != self.download_history["videos"][video_id]["file_path"]:
+                self.download_history["videos"][video_id]["file_path"] = file_path
+                
         else:
             # Create new record
             self.download_history["videos"][video_id] = {
                 "title": title,
                 "file_path": file_path,
                 "playlists": [playlist_id],
-                "downloaded_on": datetime.now().isoformat(),
-                "last_updated": datetime.now().isoformat()
+                "downloaded_on": now,
+                "last_updated": now,
+                "view_count": view_count,
+                "view_count_updated": now
             }
+            
+            # Add upload date if available
+            if upload_date:
+                self.download_history["videos"][video_id]["upload_date"] = upload_date
         
         return self._save_download_history()
+    
+    def update_video_view_count(self, video_id: str, view_count: int) -> bool:
+        """
+        Update the view count for a video.
+        
+        Args:
+            video_id: YouTube video ID
+            view_count: Current view count
+            
+        Returns:
+            True if updated successfully, False otherwise
+        """
+        if video_id not in self.download_history["videos"]:
+            logger.warning(f"Video {video_id} not found in download history.")
+            return False
+            
+        try:
+            self.download_history["videos"][video_id]["view_count"] = view_count
+            self.download_history["videos"][video_id]["view_count_updated"] = datetime.now().isoformat()
+            self.download_history["videos"][video_id]["last_updated"] = datetime.now().isoformat()
+            
+            return self._save_download_history()
+        except Exception as e:
+            logger.error(f"Error updating view count: {str(e)}")
+            return False
+    
+    def bulk_update_view_counts(self, downloader) -> Tuple[int, int]:
+        """
+        Update view counts for all videos in the history.
+        
+        Args:
+            downloader: YouTubeDownloader instance to get video info
+            
+        Returns:
+            Tuple of (number of videos updated, number of failures)
+        """
+        updated = 0
+        failed = 0
+        
+        for video_id, video_info in self.download_history["videos"].items():
+            try:
+                # Build the video URL
+                video_url = f"https://www.youtube.com/watch?v={video_id}"
+                
+                # Get updated video info
+                detailed_info = downloader.get_video_info(video_url)
+                
+                if detailed_info and 'view_count' in detailed_info:
+                    # Update the view count
+                    self.download_history["videos"][video_id]["view_count"] = detailed_info["view_count"]
+                    self.download_history["videos"][video_id]["view_count_updated"] = datetime.now().isoformat()
+                    self.download_history["videos"][video_id]["last_updated"] = datetime.now().isoformat()
+                    
+                    # Log the update
+                    old_count = video_info.get("view_count", 0)
+                    new_count = detailed_info["view_count"]
+                    change = new_count - old_count
+                    
+                    logger.info(f"Updated view count for {video_info['title']}: {old_count} -> {new_count} ({'+' if change >= 0 else ''}{change})")
+                    updated += 1
+                    
+                    # Add a small delay to avoid rate limiting
+                    time.sleep(0.5)
+                else:
+                    logger.warning(f"Could not get view count for {video_id}.")
+                    failed += 1
+            except Exception as e:
+                logger.error(f"Error updating view count for {video_id}: {str(e)}")
+                failed += 1
+        
+        # Save all the updates
+        self._save_download_history()
+        
+        logger.info(f"View count update complete: {updated} updated, {failed} failed")
+        return updated, failed
     
     def is_video_downloaded(self, video_id: str) -> bool:
         """
@@ -252,11 +349,68 @@ class DownloadTracker:
                     "id": video_id,
                     "title": video_info["title"],
                     "file_path": video_info["file_path"],
-                    "downloaded_on": video_info["downloaded_on"]
+                    "downloaded_on": video_info["downloaded_on"],
+                    "view_count": video_info.get("view_count", 0),
+                    "view_count_updated": video_info.get("view_count_updated")
                 }
                 videos.append(video_data)
         
         return videos
+    
+    def get_video_stats(self) -> Dict:
+        """
+        Get statistics about the downloaded videos.
+        
+        Returns:
+            Dictionary with statistics
+        """
+        stats = {
+            "total_videos": len(self.download_history["videos"]),
+            "total_views": 0,
+            "avg_views": 0,
+            "max_views": 0,
+            "max_views_video": None,
+            "newest_video": None,
+            "oldest_video": None
+        }
+        
+        if not self.download_history["videos"]:
+            return stats
+            
+        # Calculate statistics
+        for video_id, video_info in self.download_history["videos"].items():
+            view_count = video_info.get("view_count", 0)
+            stats["total_views"] += view_count
+            
+            # Track max views
+            if view_count > stats["max_views"]:
+                stats["max_views"] = view_count
+                stats["max_views_video"] = {
+                    "id": video_id,
+                    "title": video_info["title"],
+                    "view_count": view_count
+                }
+                
+            # Compare dates for newest/oldest if upload_date is available
+            upload_date = video_info.get("upload_date")
+            if upload_date:
+                video_date = {
+                    "id": video_id,
+                    "title": video_info["title"],
+                    "date": upload_date
+                }
+                
+                if stats["newest_video"] is None or upload_date > stats["newest_video"]["date"]:
+                    stats["newest_video"] = video_date
+                    
+                if stats["oldest_video"] is None or upload_date < stats["oldest_video"]["date"]:
+                    stats["oldest_video"] = video_date
+        
+        # Calculate average views
+        if stats["total_videos"] > 0:
+            stats["avg_views"] = stats["total_views"] / stats["total_videos"]
+        
+        return stats
     
     def check_for_updates(self) -> List[Dict]:
         """

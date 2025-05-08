@@ -43,7 +43,49 @@ class YouTubeDownloader:
             os.makedirs(self.output_dir, exist_ok=True)
             logger.info(f"Created output directory: {self.output_dir}")
     
-    def download_video(self, video_url: str, audio_only: bool = True, playlist_name: Optional[str] = None) -> Optional[str]:
+    def get_video_info(self, video_url: str) -> Optional[Dict]:
+        """
+        Get detailed information about a YouTube video including view count.
+        
+        Args:
+            video_url: URL of the YouTube video
+            
+        Returns:
+            Dictionary containing video information or None if retrieval failed
+        """
+        options = {
+            'skip_download': True,
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': False,  # We want full info
+        }
+        
+        try:
+            with yt_dlp.YoutubeDL(options) as ydl:
+                info = ydl.extract_info(video_url, download=False)
+                
+                if info:
+                    # Extract just the information we need
+                    video_info = {
+                        'id': info.get('id'),
+                        'title': info.get('title'),
+                        'view_count': info.get('view_count', 0),
+                        'uploader': info.get('uploader'),
+                        'upload_date': info.get('upload_date'),
+                        'duration': info.get('duration'),
+                        'url': video_url
+                    }
+                    
+                    logger.info(f"Retrieved info for video: {video_info['title']} (Views: {video_info['view_count']})")
+                    return video_info
+                    
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error retrieving video info for {video_url}: {str(e)}")
+            return None
+    
+    def download_video(self, video_url: str, audio_only: bool = True, playlist_name: Optional[str] = None) -> Optional[Tuple[str, Dict]]:
         """
         Download a single video from YouTube.
         
@@ -53,9 +95,15 @@ class YouTubeDownloader:
             playlist_name: Optional name of the playlist for organizing downloads
             
         Returns:
-            Path to the downloaded file or None if download failed
+            Tuple of (path to the downloaded file, video info dict) or None if download failed
         """
         try:
+            # First get video info including view count
+            video_info = self.get_video_info(video_url)
+            if not video_info:
+                logger.error(f"Could not retrieve video info for {video_url}")
+                return None
+                
             # Get audio format and bitrate from config
             audio_format = self.config.get("audio", "format", "mp3")
             audio_bitrate = self.config.get("audio", "bitrate", "192k")
@@ -79,7 +127,6 @@ class YouTubeDownloader:
                     logger.info(f"Created playlist directory: {playlist_dir}")
                 output_dir = playlist_dir
             
-            # Define options - this was missing in the original code
             options = {
                 'format': 'bestaudio/best' if audio_only else 'best',
                 'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
@@ -132,8 +179,8 @@ class YouTubeDownloader:
                     except Exception as e:
                         logger.error(f"Error normalizing audio: {str(e)}")
                 
-                logger.info(f"Successfully downloaded: {info.get('title')}")
-                return downloaded_file
+                logger.info(f"Successfully downloaded: {info.get('title')} (Views: {video_info['view_count']})")
+                return downloaded_file, video_info
                 
         except Exception as e:
             logger.error(f"Error downloading video {video_url}: {str(e)}")
@@ -150,7 +197,7 @@ class YouTubeDownloader:
             List of dictionaries containing video information
         """
         options = {
-            'extract_flat': True,
+            'extract_flat': True,  # First use extract_flat to get video IDs quickly
             'skip_download': True,
             'quiet': True,
             'no_warnings': True,
@@ -164,17 +211,32 @@ class YouTubeDownloader:
                     logger.error(f"No videos found in playlist: {playlist_url}")
                     return []
                 
-                # Extract relevant info for each video
+                # Extract basic info for each video and then get detailed info
                 videos = []
                 for entry in playlist_info['entries']:
                     if entry:
+                        video_url = f"https://www.youtube.com/watch?v={entry.get('id')}"
+                        
+                        # Get basic info from the flat extraction
                         video_info = {
                             'id': entry.get('id'),
                             'title': entry.get('title'),
-                            'url': f"https://www.youtube.com/watch?v={entry.get('id')}",
+                            'url': video_url,
                             'duration': entry.get('duration'),
                             'uploader': entry.get('uploader'),
+                            'view_count': 0  # Default value, will try to update
                         }
+                        
+                        # Attempt to get detailed info for view count
+                        # If it fails, we still have the basic info
+                        try:
+                            detailed_info = self.get_video_info(video_url)
+                            if detailed_info and 'view_count' in detailed_info:
+                                video_info['view_count'] = detailed_info['view_count']
+                                video_info['upload_date'] = detailed_info.get('upload_date')
+                        except Exception as e:
+                            logger.warning(f"Could not get detailed info for {video_url}: {str(e)}")
+                        
                         videos.append(video_info)
                 
                 logger.info(f"Found {len(videos)} videos in playlist: {playlist_url}")
@@ -214,10 +276,13 @@ class YouTubeDownloader:
             result = self.download_video(video_url, audio_only, playlist_name)
             
             if result:
+                downloaded_file, video_info = result
                 successful.append({
                     'id': video['id'],
                     'title': video['title'],
-                    'file_path': result
+                    'file_path': downloaded_file,
+                    'view_count': video_info.get('view_count', 0),
+                    'upload_date': video_info.get('upload_date')
                 })
             else:
                 failed.append(video['id'])
