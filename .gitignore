@@ -56,3 +56,6 @@ htmlcov/
 nosetests.xml
 coverage.xml
 *,cover
+
+# Future plans
+todo/

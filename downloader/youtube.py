@@ -136,6 +136,9 @@ class YouTubeDownloader:
                 'no_warnings': False,
                 'default_search': 'auto',
                 'source_address': '0.0.0.0',
+                # Extract additional metadata for scoring
+                'writeinfojson': False,  # Don't write info.json file
+                'writethumbnail': False,  # Don't download thumbnail
             }
             
             # Add FFmpeg location if available
@@ -150,6 +153,7 @@ class YouTubeDownloader:
                 }]
             
             with yt_dlp.YoutubeDL(options) as ydl:
+                logger.info(f"Downloading video: {video_url}")
                 info = ydl.extract_info(video_url, download=True)
                 if audio_only:
                     # The file will be named with the specified audio format extension
@@ -169,6 +173,7 @@ class YouTubeDownloader:
                     try:
                         from downloader.converter import AudioConverter
                         target_level = self.config.getfloat("audio", "target_level", -18.0)
+                        logger.info(f"Normalizing audio to target level: {target_level} dB")
                         normalized_file = AudioConverter.normalize_audio(
                             downloaded_file, 
                             target_level=target_level
@@ -179,11 +184,81 @@ class YouTubeDownloader:
                     except Exception as e:
                         logger.error(f"Error normalizing audio: {str(e)}")
                 
-                logger.info(f"Successfully downloaded: {info.get('title')} (Views: {video_info['view_count']})")
-                return downloaded_file, video_info
+                # Extract additional metadata for scoring system
+                video_data = {
+                    'id': info.get('id', ''),
+                    'title': info.get('title', 'Unknown Title'),
+                    'view_count': info.get('view_count', 0),
+                    'comment_count': info.get('comment_count', 0),
+                    'like_count': info.get('like_count', 0),
+                    'dislike_count': info.get('dislike_count', 0),
+                    'upload_date': info.get('upload_date', ''),
+                    'uploader': info.get('uploader', ''),
+                    'duration': info.get('duration', 0),
+                    'categories': info.get('categories', []),
+                    'tags': info.get('tags', []),
+                    'url': video_url
+                }
+                
+                # Update the scoring system with video metadata
+                try:
+                    from downloader.scoring import ScoringSystem
+                    scoring = ScoringSystem()
+                    
+                    # Determine if this is a new release (less than 14 days old)
+                    is_new_release = False
+                    if video_data.get('upload_date'):
+                        from datetime import datetime
+                        try:
+                            upload_date = datetime.strptime(video_data['upload_date'], '%Y%m%d')
+                            days_since_upload = (datetime.now() - upload_date).days
+                            is_new_release = days_since_upload < 14
+                        except ValueError:
+                            # If date parsing fails, default to False
+                            pass
+                    
+                    # Update scoring system with this video's data
+                    scoring.update_video_metadata(
+                        video_id=video_data['id'],
+                        title=video_data['title'],
+                        youtube_views=video_data['view_count'],
+                        youtube_comments=video_data['comment_count'],
+                        upload_date=video_data['upload_date'],
+                        is_new_release=is_new_release
+                    )
+                    
+                    # Extract playlist ID if available
+                    playlist_id = None
+                    if playlist_name and "list=" in video_url:
+                        import re
+                        playlist_match = re.search(r'list=([^&]+)', video_url)
+                        if playlist_match:
+                            playlist_id = playlist_match.group(1)
+                            
+                            # Update playlist in scoring system if we have a playlist ID
+                            if playlist_id:
+                                logger.info(f"Updating playlist in scoring system: {playlist_id}")
+                                # Default values for initial playlist addition
+                                scoring.update_playlist_performance(
+                                    playlist_id=playlist_id,
+                                    name=playlist_name,
+                                    viewer_change=0  # Default neutral value for initial addition
+                                )
+                    
+                    logger.info(f"Updated scoring system for video: {video_data['title']}")
+                    
+                except Exception as e:
+                    logger.warning(f"Error updating scoring system: {str(e)}")
+                    import traceback
+                    logger.debug(traceback.format_exc())
+                
+                logger.info(f"Successfully downloaded: {info.get('title')} (Views: {video_data['view_count']})")
+                return downloaded_file, video_data
                 
         except Exception as e:
             logger.error(f"Error downloading video {video_url}: {str(e)}")
+            import traceback
+            logger.debug(traceback.format_exc())
             return None
     
     def get_playlist_videos(self, playlist_url: str) -> List[Dict]:

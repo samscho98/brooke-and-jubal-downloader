@@ -14,6 +14,7 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 from gui_app.settings_gui import PlaylistDownloaderGUI
+from gui_app.components.theme_manager import configure_root_for_metro
 
 def main():
     """Main entry point for the GUI application"""
@@ -29,6 +30,9 @@ def main():
     try:
         # Create the root window
         root = tk.Tk()
+        
+        # Apply the Metro Flat theme (ADD THIS LINE)
+        configure_root_for_metro(root)
         
         # Setup exception handler
         def show_error(exc_type, exc_value, exc_traceback):

@@ -15,6 +15,7 @@ from utils.file_manager import FileManager
 from downloader.youtube import YouTubeDownloader
 from downloader.converter import AudioConverter
 from downloader.tracker import DownloadTracker
+from downloader.scoring import ScoringSystem
 
 # Set up logging
 def setup_logging(log_level: str = "INFO", log_file: Optional[str] = None) -> None:
@@ -76,8 +77,14 @@ def parse_arguments() -> argparse.Namespace:
         metavar="URL",
         help="Remove a playlist from tracking"
     )
+
+    parser.add_argument(
+        "--top-scored",
+        metavar="N",
+        type=int,
+        help="Show top N videos by score"
+    )
     
-    # New view count arguments
     parser.add_argument(
         "--update-views",
         action="store_true",
@@ -128,6 +135,39 @@ def parse_arguments() -> argparse.Namespace:
     )
     
     return parser.parse_args()
+
+def display_top_scored_videos(scoring: ScoringSystem, limit: int = 10) -> None:
+    """
+    Display top videos by score.
+    
+    Args:
+        scoring: ScoringSystem instance
+        limit: Number of videos to display
+    """
+    # Get current time slot
+    current_slot = scoring.get_current_time_slot()
+    print(f"\nCurrent time slot: {current_slot}")
+    
+    # Get top videos for current time slot
+    videos = scoring.get_top_videos(time_slot=current_slot, limit=limit)
+    
+    print(f"\nTop {min(limit, len(videos))} Videos by Score for {current_slot}:")
+    print("-" * 80)
+    
+    for i, video in enumerate(videos, 1):
+        title = video.get('title', 'Unknown Title')
+        score = video.get('score', 0)
+        base_score = video.get('base_score', 0)
+        engagement_score = video.get('engagement_score', 0)
+        youtube_views = video.get('youtube_views', 0)
+        
+        print(f"{i}. {title}")
+        print(f"   Score: {score:.2f} (Base: {base_score:.2f}, Engagement: {engagement_score:.2f})")
+        print(f"   Views: {youtube_views:,}")
+        if video.get('is_new_release', False):
+            print(f"   [NEW RELEASE]")
+        print(f"   ID: {video.get('id', 'Unknown')}")
+        print()
 
 def display_playlists(tracker: DownloadTracker) -> None:
     """
@@ -419,6 +459,7 @@ def main() -> int:
     file_manager = FileManager(output_dir)
     downloader = YouTubeDownloader(output_dir, config)
     converter = AudioConverter()
+    scoring_system = ScoringSystem()
     tracker = DownloadTracker(
         history_file="gui_app/download_history.json",
         playlists_file="gui_app/playlists.json"
@@ -458,6 +499,10 @@ def main() -> int:
     
     elif args.list_playlists:
         display_playlists(tracker)
+
+    elif args.top_scored:
+        limit = max(1, args.top_scored)
+        display_top_scored_videos(scoring_system, limit)  # Use the already initialized scoring_system
     
     elif args.remove_playlist:
         success = tracker.remove_playlist(args.remove_playlist)
@@ -516,9 +561,10 @@ def main() -> int:
             print("6. Update view counts for all videos")
             print("7. Show video statistics")
             print("8. Show top videos by view count")
-            print("9. Exit")
+            print("9. Show top videos by score")
+            print("10. Exit")
             
-            choice = input("\nEnter your choice (1-9): ")
+            choice = input("\nEnter your choice (1-10): ")
             
             if choice == "1":
                 url = input("Enter YouTube URL: ")
@@ -626,6 +672,15 @@ def main() -> int:
                     display_top_videos(tracker, 10)
             
             elif choice == "9":
+                limit = input("How many videos to show? (default: 10): ")
+                try:
+                    limit = int(limit) if limit.strip() else 10
+                    display_top_scored_videos(scoring_system, limit)
+                except ValueError:
+                    print("Invalid input. Showing top 10 videos.")
+                    display_top_scored_videos(scoring_system, 10)
+            
+            elif choice == "10":
                 print("Exiting...")
                 return 0
             

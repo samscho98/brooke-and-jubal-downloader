@@ -35,6 +35,8 @@ from downloader.youtube import YouTubeDownloader
 from gui_app.components.playlist_manager import PlaylistPanel
 from gui_app.components.settings_panel import SettingsPanel
 from gui_app.components.updater_panel import UpdaterPanel
+from gui_app.components.audio_player import AudioPlayerPanel
+from gui_app.components.theme_manager import configure_root_for_metro
 
 class PlaylistDownloaderGUI:
     """GUI application for managing YouTube Playlist Downloader settings"""
@@ -45,6 +47,9 @@ class PlaylistDownloaderGUI:
         self.root.title("YouTube Playlist Downloader")
         self.root.geometry("950x650")
         self.root.minsize(900, 600)
+
+        # Apply Metro Flat theme
+        configure_root_for_metro(self.root)
         
         # Initialize configuration and trackers
         self.config = ConfigHandler("config.ini")
@@ -70,8 +75,12 @@ class PlaylistDownloaderGUI:
         self.update_tab = UpdaterPanel(self.notebook, __version__, REPO_OWNER, REPO_NAME)
         self.about_tab = self._create_about_tab()
         
+        # Add the new audio player tab
+        self.audio_player_tab = AudioPlayerPanel(self.notebook, history_file="gui_app/download_history.json")
+        
         self.notebook.add(self.playlists_tab, text="Playlists")
         self.notebook.add(self.single_video_tab, text="Download Video")
+        self.notebook.add(self.audio_player_tab, text="Audio Player")  # Add the player tab here
         self.notebook.add(self.settings_tab, text="Settings")
         self.notebook.add(self.update_tab, text="Updates")
         self.notebook.add(self.about_tab, text="About")

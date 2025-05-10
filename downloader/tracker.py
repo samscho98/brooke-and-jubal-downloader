@@ -1,6 +1,6 @@
 """
-Download tracker module.
-Keeps track of downloaded files and maintains the collection up to date.
+Enhanced download tracker module.
+An enhanced version of the tracker that includes playlist names in the download history.
 """
 import os
 import json
@@ -11,8 +11,8 @@ import time
 
 logger = logging.getLogger(__name__)
 
-class DownloadTracker:
-    """Class to track downloaded videos and maintain the collection state."""
+class EnhancedDownloadTracker:
+    """Enhanced class to track downloaded videos with playlist names."""
     
     def __init__(self, history_file: str = "download_history.json", 
                 playlists_file: str = "playlists.json"):
@@ -28,6 +28,9 @@ class DownloadTracker:
         self.download_history = self._load_download_history()
         self.playlists = self._load_playlists()
         
+        # Upgrade existing history file to include playlist names if needed
+        self._upgrade_history_with_playlist_names()
+    
     def _load_download_history(self) -> Dict:
         """
         Load the download history from file.
@@ -109,6 +112,57 @@ class DownloadTracker:
             logger.error(f"Error saving playlists: {str(e)}")
             return False
     
+    def _get_playlist_name(self, playlist_id: str) -> str:
+        """
+        Get the user-defined name of a playlist from its ID.
+        
+        Args:
+            playlist_id: YouTube playlist ID
+            
+        Returns:
+            Playlist name or None if not found
+        """
+        for playlist in self.playlists["playlists"]:
+            # Extract playlist ID from URL
+            import re
+            url = playlist.get("url", "")
+            match = re.search(r'list=([^&]+)', url)
+            if match and match.group(1) == playlist_id:
+                return playlist.get("name", "Unknown Playlist")
+        
+        return "Unknown Playlist"
+    
+    def _upgrade_history_with_playlist_names(self) -> None:
+        """
+        Upgrade the existing download history to include playlist names.
+        This is called once on initialization to ensure the history includes playlist names.
+        """
+        updated = False
+        
+        for video_id, video_info in self.download_history["videos"].items():
+            # Check if this video has playlist information in the old format
+            if "playlists" in video_info and isinstance(video_info["playlists"], list):
+                # Initialize the enhanced playlist information
+                if "playlist_info" not in video_info:
+                    video_info["playlist_info"] = []
+                    
+                    # Convert the old format to the new format
+                    for playlist_id in video_info["playlists"]:
+                        playlist_name = self._get_playlist_name(playlist_id)
+                        
+                        # Add to the new format if not already present
+                        if not any(p.get("id") == playlist_id for p in video_info["playlist_info"]):
+                            video_info["playlist_info"].append({
+                                "id": playlist_id,
+                                "name": playlist_name
+                            })
+                    
+                    updated = True
+        
+        if updated:
+            logger.info("Upgraded download history to include playlist names")
+            self._save_download_history()
+    
     def add_playlist(self, url: str, name: str = None, check_interval: int = 24) -> bool:
         """
         Add a new playlist to track.
@@ -141,7 +195,48 @@ class DownloadTracker:
         }
         
         self.playlists["playlists"].append(playlist_info)
+        
+        # Update any existing videos from this playlist with the correct name
+        self._update_videos_with_playlist_name(url, name)
+        
         return self._save_playlists()
+    
+    def _update_videos_with_playlist_name(self, playlist_url: str, playlist_name: str) -> None:
+        """
+        Update existing videos with the correct playlist name.
+        
+        Args:
+            playlist_url: URL of the playlist
+            playlist_name: Name of the playlist
+        """
+        # Extract playlist ID from URL
+        import re
+        match = re.search(r'list=([^&]+)', playlist_url)
+        if not match:
+            return
+            
+        playlist_id = match.group(1)
+        
+        # Update all videos that belong to this playlist
+        for video_id, video_info in self.download_history["videos"].items():
+            if "playlists" in video_info and playlist_id in video_info["playlists"]:
+                # Initialize playlist_info if it doesn't exist
+                if "playlist_info" not in video_info:
+                    video_info["playlist_info"] = []
+                
+                # Update or add the playlist name
+                found = False
+                for playlist in video_info["playlist_info"]:
+                    if playlist.get("id") == playlist_id:
+                        playlist["name"] = playlist_name
+                        found = True
+                        break
+                
+                if not found:
+                    video_info["playlist_info"].append({
+                        "id": playlist_id,
+                        "name": playlist_name
+                    })
     
     def remove_playlist(self, url: str) -> bool:
         """
@@ -191,10 +286,10 @@ class DownloadTracker:
         return False
     
     def add_downloaded_video(self, video_id: str, playlist_id: str, 
-                           title: str, file_path: str, 
-                           view_count: int = 0, upload_date: Optional[str] = None) -> bool:
+                          title: str, file_path: str, 
+                          view_count: int = 0, upload_date: Optional[str] = None) -> bool:
         """
-        Add a downloaded video to the history.
+        Add a downloaded video to the history with enhanced playlist information.
         
         Args:
             video_id: YouTube video ID
@@ -209,29 +304,66 @@ class DownloadTracker:
         """
         now = datetime.now().isoformat()
         
+        # Get the playlist name
+        playlist_name = self._get_playlist_name(playlist_id)
+        
         if video_id in self.download_history["videos"]:
             # Update existing record
-            self.download_history["videos"][video_id]["playlists"].append(playlist_id)
-            self.download_history["videos"][video_id]["playlists"] = list(set(
-                self.download_history["videos"][video_id]["playlists"]
-            ))
-            self.download_history["videos"][video_id]["last_updated"] = now
+            video_entry = self.download_history["videos"][video_id]
+            
+            # Ensure backwards compatibility with playlists array
+            if "playlists" not in video_entry:
+                video_entry["playlists"] = []
+            
+            # Add to playlists array if not already there
+            if playlist_id not in video_entry["playlists"]:
+                video_entry["playlists"].append(playlist_id)
+            
+            # Ensure unique values
+            video_entry["playlists"] = list(set(video_entry["playlists"]))
+            
+            # Update enhanced playlist info
+            if "playlist_info" not in video_entry:
+                video_entry["playlist_info"] = []
+            
+            # Check if playlist already exists in playlist_info
+            found = False
+            for playlist in video_entry["playlist_info"]:
+                if playlist.get("id") == playlist_id:
+                    # Update name in case it changed
+                    playlist["name"] = playlist_name
+                    found = True
+                    break
+            
+            # Add new playlist info if not found
+            if not found:
+                video_entry["playlist_info"].append({
+                    "id": playlist_id,
+                    "name": playlist_name
+                })
+            
+            # Update other fields
+            video_entry["last_updated"] = now
             
             # Update view count if provided
             if view_count > 0:
-                self.download_history["videos"][video_id]["view_count"] = view_count
-                self.download_history["videos"][video_id]["view_count_updated"] = now
+                video_entry["view_count"] = view_count
+                video_entry["view_count_updated"] = now
                 
             # Update file path if it's changed
-            if file_path and file_path != self.download_history["videos"][video_id]["file_path"]:
-                self.download_history["videos"][video_id]["file_path"] = file_path
+            if file_path and file_path != video_entry["file_path"]:
+                video_entry["file_path"] = file_path
                 
         else:
-            # Create new record
+            # Create new record with enhanced playlist info
             self.download_history["videos"][video_id] = {
                 "title": title,
                 "file_path": file_path,
-                "playlists": [playlist_id],
+                "playlists": [playlist_id],  # Keep for backwards compatibility
+                "playlist_info": [{
+                    "id": playlist_id,
+                    "name": playlist_name
+                }],
                 "downloaded_on": now,
                 "last_updated": now,
                 "view_count": view_count,
@@ -339,21 +471,37 @@ class DownloadTracker:
             playlist_id: Optional YouTube playlist ID to filter by
             
         Returns:
-            List of video dictionaries
+            List of video dictionaries with enhanced playlist information
         """
         videos = []
         
         for video_id, video_info in self.download_history["videos"].items():
-            if playlist_id is None or playlist_id in video_info["playlists"]:
-                video_data = {
-                    "id": video_id,
-                    "title": video_info["title"],
-                    "file_path": video_info["file_path"],
-                    "downloaded_on": video_info["downloaded_on"],
-                    "view_count": video_info.get("view_count", 0),
-                    "view_count_updated": video_info.get("view_count_updated")
-                }
-                videos.append(video_data)
+            # Filter by playlist if required
+            if playlist_id is not None:
+                if "playlists" not in video_info or playlist_id not in video_info["playlists"]:
+                    continue
+            
+            # Create a copy of video info with additional fields
+            video_data = {
+                "id": video_id,
+                "title": video_info["title"],
+                "file_path": video_info["file_path"],
+                "downloaded_on": video_info["downloaded_on"],
+                "view_count": video_info.get("view_count", 0),
+                "view_count_updated": video_info.get("view_count_updated")
+            }
+            
+            # Add the enhanced playlist information
+            if "playlist_info" in video_info:
+                video_data["playlist_info"] = video_info["playlist_info"]
+            elif "playlists" in video_info:
+                # Create basic playlist info from IDs if needed
+                video_data["playlist_info"] = []
+                for p_id in video_info["playlists"]:
+                    name = self._get_playlist_name(p_id)
+                    video_data["playlist_info"].append({"id": p_id, "name": name})
+            
+            videos.append(video_data)
         
         return videos
     
@@ -436,3 +584,11 @@ class DownloadTracker:
                 playlists_to_update.append(playlist)
         
         return playlists_to_update
+    
+# Wrapper class for backward compatibility
+class DownloadTracker(EnhancedDownloadTracker):
+    """
+    Wrapper class for backward compatibility.
+    This maintains the original class name that other modules import.
+    """
+    pass
