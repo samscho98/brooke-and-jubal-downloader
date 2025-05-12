@@ -286,8 +286,10 @@ class EnhancedDownloadTracker:
         return False
     
     def add_downloaded_video(self, video_id: str, playlist_id: str, 
-                          title: str, file_path: str, 
-                          view_count: int = 0, upload_date: Optional[str] = None) -> bool:
+                        title: str, file_path: str, 
+                        view_count: int = 0, comment_count: int = 0,
+                        upload_date: Optional[str] = None,
+                        duration_seconds: float = 0.0) -> bool:
         """
         Add a downloaded video to the history with enhanced playlist information.
         
@@ -297,7 +299,9 @@ class EnhancedDownloadTracker:
             title: Title of the video
             file_path: Path to the downloaded file
             view_count: Number of views the video has
+            comment_count: Number of comments the video has
             upload_date: Date the video was uploaded (YYYYMMDD format)
+            duration_seconds: Duration of the video in seconds
             
         Returns:
             True if added successfully, False otherwise
@@ -306,6 +310,21 @@ class EnhancedDownloadTracker:
         
         # Get the playlist name
         playlist_name = self._get_playlist_name(playlist_id)
+        
+        # Calculate additional metadata
+        is_new_release = False
+        days_since_release = None
+        if upload_date:
+            try:
+                upload_dt = datetime.strptime(upload_date, "%Y%m%d")
+                days_since_release = (datetime.now() - upload_dt).days
+                is_new_release = days_since_release < 14
+            except ValueError:
+                # If date format is invalid, skip this calculation
+                pass
+        
+        # Convert duration from seconds to minutes
+        duration_minutes = duration_seconds / 60.0 if duration_seconds else None
         
         if video_id in self.download_history["videos"]:
             # Update existing record
@@ -350,13 +369,27 @@ class EnhancedDownloadTracker:
                 video_entry["view_count"] = view_count
                 video_entry["view_count_updated"] = now
                 
+            # Update comment count if provided
+            if comment_count > 0:
+                video_entry["comment_count"] = comment_count
+                video_entry["comment_count_updated"] = now
+                
             # Update file path if it's changed
-            if file_path and file_path != video_entry["file_path"]:
+            if file_path and file_path != video_entry.get("file_path"):
                 video_entry["file_path"] = file_path
                 
+            # Update duration if provided
+            if duration_minutes:
+                video_entry["duration_minutes"] = duration_minutes
+            
+            # Add calculated fields
+            if days_since_release is not None:
+                video_entry["days_since_release"] = days_since_release
+                video_entry["is_new_release"] = is_new_release
+                
         else:
-            # Create new record with enhanced playlist info
-            self.download_history["videos"][video_id] = {
+            # Create new record with enhanced information
+            new_entry = {
                 "title": title,
                 "file_path": file_path,
                 "playlists": [playlist_id],  # Keep for backwards compatibility
@@ -367,12 +400,23 @@ class EnhancedDownloadTracker:
                 "downloaded_on": now,
                 "last_updated": now,
                 "view_count": view_count,
-                "view_count_updated": now
+                "view_count_updated": now,
+                "comment_count": comment_count,
+                "comment_count_updated": now,
             }
             
-            # Add upload date if available
+            # Add optional fields if available
             if upload_date:
-                self.download_history["videos"][video_id]["upload_date"] = upload_date
+                new_entry["upload_date"] = upload_date
+            
+            if duration_minutes:
+                new_entry["duration_minutes"] = duration_minutes
+                
+            if days_since_release is not None:
+                new_entry["days_since_release"] = days_since_release
+                new_entry["is_new_release"] = is_new_release
+                
+            self.download_history["videos"][video_id] = new_entry
         
         return self._save_download_history()
     

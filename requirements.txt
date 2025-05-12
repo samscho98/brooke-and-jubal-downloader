@@ -5,6 +5,12 @@ configparser>=5.3.0
 
 # GUI requirements
 pygame>=2.5.0  # Added for audio playback in the new Audio Player tab
+PyQt5==5.15.9
+qdarkstyle==3.0.2
+PyQt5-Qt5==5.15.2
+PyQt5-sip==12.11.0
+mutagen>=1.45.1
+qdarkstyle==3.0.2
 
 # Audio processing
 ffmpeg-python>=0.2.0

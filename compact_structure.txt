@@ -1,0 +1,881 @@
+f app.log
+d bin
+  f bin\ffmpeg.exe
+  f bin\icon.ico
+d cli
+  f cli\__init__.py
+  c ```
+  """
+  CLI package for YouTube Playlist Downloader.
+  """
+  from cli.app import CLIApp
+  
+  __all__ = ['CLIApp']
+  ```
+  f cli\app.py
+  f cli\commands.py
+  f cli\display.py
+f cli_main.py
+c ```
+#!/usr/bin/env python3
+"""
+Command-line interface entry point for YouTube Playlist Downloader.
+"""
+import sys
+from cli.app import CLIApp
+
+def main():
+    """Run the CLI application."""
+    app = CLIApp()
+    return app.run()
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        print("\nOperation cancelled by user")
+        sys.exit(1)
+    except Exception as e:
+        import logging
+        logging.exception("Unhandled exception")
+        print(f"\nError: {str(e)}")
+        sys.exit(1)
+```
+f config.ini
+c ```
+[general]
+output_directory = data/audio
+check_interval = 24
+max_downloads = 10
+
+[audio]
+format = mp3
+bitrate = 192k
+normalize_audio = True
+target_level = -18.0
+
+[player]
+default_playlist = latest
+keep_history = True
+auto_normalize = True
+
+[scoring]
+enable_scoring = True
+score_decay = 0.9
+new_content_boost = 1.5
+
+[logging]
+level = INFO
+file = app.log
+console = True
+
+
+```
+f config.ini.bak
+c ```
+[general]
+output_directory = data/audio
+check_interval = 24
+max_downloads = 10
+
+[audio]
+format = mp3
+bitrate = 192k
+normalize_audio = True
+target_level = -18.0
+
+[player]
+default_playlist = latest
+keep_history = True
+auto_normalize = True
+
+[scoring]
+enable_scoring = True
+score_decay = 0.9
+new_content_boost = 1.5
+
+[logging]
+level = INFO
+file = app.log
+console = True
+
+
+```
+d data
+  f data\__init__.py
+  c ```
+  """
+  Data management package for persistent storage operations.
+  """
+  from data.config_manager import ConfigHandler as ConfigManager
+  from data.file_manager import FileManager
+  from data.json_storage import JSONStorage
+  from data.storage import StorageInterface
+  
+  __all__ = ['ConfigManager', 'FileManager', 'JSONStorage', 'StorageInterface']
+  ```
+  f data\config_manager.py
+  f data\download_history.json
+  f data\file_manager.py
+  f data\json_storage.py
+  f data\metrics.json
+  c ```
+  {
+    "videos": {},
+    "playlists": {},
+    "time_slots": {
+      "US_PrimeTime": {
+        "start_time": "22:00",
+        "end_time": "03:00",
+        "performance_factor": 1.3
+      },
+      "UK_Evening": {
+        "start_time": "18:00",
+        "end_time": "22:00",
+        "performance_factor": 1.1
+      },
+      "PH_Evening": {
+        "start_time": "10:00",
+        "end_time": "16:00",
+        "performance_factor": 0.9
+      },
+      "Low_Traffic": {
+        "start_time": "03:00",
+        "end_time": "10:00",
+        "performance_factor": 0.7
+      }
+    },
+    "last_updated": "2023-01-01T12:00:00"
+  }
+  ```
+  f data\play_history.json
+  c ```
+  {
+    "history": [],
+    "last_updated": "2023-01-01T12:00:00"
+  }
+  ```
+  f data\playlists.json
+  c ```
+  {
+    "playlists": [
+      {
+        "name": "Brooke and Jeffrey - Say yes to the ex",
+        "url": "https://www.youtube.com/playlist?list=PL-h8WShBTzeKkL4uRtzMKw4Exo64mazsx",
+        "check_interval": 24,
+        "last_checked": "2025-05-11T23:01:57.217892",
+        "added_on": "2025-05-09T23:39:17.971485"
+      },
+      {
+        "name": "Brooke and Jeffrey - Am I The Jerk?",
+        "url": "https://www.youtube.com/playlist?list=PL-h8WShBTzeJhxAtZsnrzQ9uI_4tNJo6v",
+        "check_interval": 24,
+        "last_checked": "2025-05-11T23:02:05.478127",
+        "added_on": "2025-05-09T23:40:04.365774"
+      },
+      {
+        "name": "Jubal Show - First day follow up",
+        "url": "https://www.youtube.com/playlist?list=PLRfyF2PfrYAlc59ihuVL03nBen3R3_Ya4",
+        "check_interval": 24,
+        "last_checked": "2025-05-11T23:08:26.214881",
+        "added_on": "2025-05-09T23:40:59.608169"
+      }
+    ]
+  }
+  ```
+  f data\storage.py
+  f data\video_scores.json
+d docs
+  f docs\api.md
+  f docs\architecture.md
+  f docs\scoring_system.md
+  f docs\usage.md
+d downloader
+  f downloader\__init__.py
+  c ```
+  """
+  YouTube downloader package for downloading and processing videos.
+  """
+  from downloader.youtube import YouTubeDownloader
+  from downloader.converter import AudioConverter
+  from downloader.tracker import DownloadTracker
+  
+  __all__ = ['YouTubeDownloader', 'AudioConverter', 'DownloadTracker']
+  ```
+  f downloader\converter.py
+  f downloader\scoring.py
+  f downloader\tracker.py
+  f downloader\youtube.py
+d gui
+  f gui\__init__.py
+  c ```
+  """GUI package for YouTube Playlist Downloader."""
+  # Import statements for making components available
+  from gui.main_window import YouTubePlaylistDownloaderApp
+  
+  __all__ = ['YouTubePlaylistDownloaderApp']
+  
+  ```
+  d gui\components
+    f gui\components\__init__.py
+    c ```
+    """Reusable UI components for the application."""
+    # Import statements
+    
+    ```
+    f gui\components\playlist_table.py
+    c ```
+    """Table for displaying and managing playlists."""
+    from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QWidget, QHBoxLayout, QPushButton
+    from PyQt5.QtCore import Qt, pyqtSignal
+    
+    class PlaylistTable(QTableWidget):
+        """Table for displaying and managing playlists."""
+        update_requested = pyqtSignal(str)
+        remove_requested = pyqtSignal(str)
+        # Implementation
+    
+    ```
+    f gui\components\progress_dialog.py
+    c ```
+    """Custom progress dialog for downloads and updates."""
+    from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton
+    from PyQt5.QtCore import Qt, pyqtSignal
+    
+    class ProgressDialog(QDialog):
+        """Custom progress dialog with cancel button."""
+        canceled = pyqtSignal()
+        # Implementation
+    
+    ```
+    f gui\components\queue_table.py
+    f gui\components\time_slider.py
+    f gui\components\volume_control.py
+  d gui\dialogs
+    f gui\dialogs\__init__.py
+    c ```
+    """Dialog modules for the application."""
+    # Import statements
+    
+    ```
+    f gui\dialogs\add_playlist_dialog.py
+    c ```
+    """Dialog for adding a new playlist."""
+    from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QSpinBox, QPushButton
+    from PyQt5.QtCore import pyqtSignal
+    
+    class AddPlaylistDialog(QDialog):
+        """Dialog for adding a new playlist to track."""
+        playlist_added = pyqtSignal(str, str, int)
+        # Implementation
+    
+    ```
+    f gui\dialogs\download_dialog.py
+    f gui\dialogs\queue_dialog.py
+    c ```
+    """Dialog for creating and managing custom queues."""
+    from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QCheckBox, QPushButton
+    from PyQt5.QtCore import pyqtSignal
+    
+    class QueueDialog(QDialog):
+        """Dialog for creating a custom audio queue."""
+        queue_created = pyqtSignal(list)
+        # Implementation
+    
+    ```
+  d gui\icons
+    f gui\icons\logo.svg
+    f gui\icons\pause.svg
+    f gui\icons\play.svg
+    f gui\icons\skip_next.svg
+    f gui\icons\skip_previous.svg
+    f gui\icons\volume_up.svg
+  f gui\main_window.py
+  d gui\models
+    f gui\models\__init__.py
+    c ```
+    """UI models for the application."""
+    # Import statements
+    
+    ```
+    f gui\models\playlist_model.py
+    c ```
+    """Model for managing playlists."""
+    from PyQt5.QtCore import QObject, pyqtSignal
+    
+    class PlaylistModel(QObject):
+        """Model for playlist data and operations."""
+        playlists_updated = pyqtSignal(list)
+        download_started = pyqtSignal(str)
+        download_finished = pyqtSignal(str, int)
+        # Implementation
+    
+    ```
+    f gui\models\queue_model.py
+    c ```
+    """Model for managing the audio queue."""
+    from PyQt5.QtCore import QObject, pyqtSignal
+    
+    class QueueModel(QObject):
+        """Model for the audio queue data and operations."""
+        queue_updated = pyqtSignal(list)
+        current_track_changed = pyqtSignal(dict)
+        # Implementation
+    
+    ```
+    f gui\models\settings_model.py
+    c ```
+    """Model for managing application settings."""
+    from PyQt5.QtCore import QObject, pyqtSignal
+    
+    class SettingsModel(QObject):
+        """Model for application settings data and operations."""
+        settings_updated = pyqtSignal(dict)
+        # Implementation
+    
+    ```
+  d gui\pages
+    f gui\pages\__init__.py
+    c ```
+    """Page modules for the application."""
+    # Import statements
+    
+    ```
+    f gui\pages\about_page.py
+    f gui\pages\analytics_page.py
+    c ```
+    """Analytics page for the YouTube Playlist Downloader."""
+    from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QComboBox, QTableWidget, QTableWidgetItem
+    from PyQt5.QtCore import Qt
+    
+    from downloader.tracker import DownloadTracker
+    from downloader.scoring import ScoringSystem
+    
+    class AnalyticsPage(QWidget):
+        """Analytics and statistics page."""
+        # Implementation
+    
+    ```
+    f gui\pages\player_page.py
+    f gui\pages\playlists_page.py
+    f gui\pages\settings_page.py
+    c ```
+    """Settings page for the YouTube Playlist Downloader."""
+    from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTabWidget, QGroupBox, QLabel, QLineEdit, QPushButton, QSpinBox, QDoubleSpinBox, QComboBox, QCheckBox
+    from PyQt5.QtCore import pyqtSignal
+    
+    from data.config_manager import ConfigHandler
+    from downloader.youtube import YouTubeDownloader
+    
+    class SettingsPage(QWidget):
+        """Settings management page."""
+        settings_saved = pyqtSignal()
+        # Implementation
+    
+    ```
+  d gui\utils
+    f gui\utils\__init__.py
+    c ```
+    """Utility modules for the UI."""
+    # Import statements
+    
+    ```
+    f gui\utils\icon_provider.py
+    c ```
+    """Icon provider for the application."""
+    import os
+    from PyQt5.QtGui import QIcon, QPixmap
+    from PyQt5.QtCore import QSize, Qt
+    
+    class IconProvider:
+        """Utility for loading and managing icons."""
+        # Implementation
+    
+    ```
+    f gui\utils\style_loader.py
+    c ```
+    """Style sheet loader for the application."""
+    import os
+    
+    class StyleLoader:
+        """Utility for loading and applying styles."""
+        # Implementation
+    
+    ```
+    f gui\utils\time_formatter.py
+    c ```
+    """Time formatting utilities."""
+    
+    class TimeFormatter:
+        """Utility for formatting time values."""
+        @staticmethod
+        def format_duration(milliseconds):
+            """Format milliseconds to MM:SS display."""
+            # Implementation
+        
+        @staticmethod
+        def format_timestamp(timestamp):
+            """Format a timestamp to a readable date/time."""
+            # Implementation
+    
+    ```
+    f gui\utils\url_detector.py
+f gui_main.py
+c ```
+#!/usr/bin/env python3
+"""
+GUI entry point for YouTube Playlist Downloader.
+"""
+import sys
+from gui.sidebar_app import launch_gui
+
+def main():
+    return launch_gui()
+
+if __name__ == "__main__":
+    sys.exit(main())
+
+```
+d icons
+f launch_hidden.vbs
+c ```
+CreateObject("Wscript.Shell").Run """" & WScript.Arguments(0) & """", 0, False
+
+```
+f main.py
+f README.md
+f requirements.txt
+c ```
+# Core dependencies
+yt-dlp>=2023.3.4
+pydub>=0.25.1
+configparser>=5.3.0
+
+# GUI requirements
+pygame>=2.5.0  # Added for audio playback in the new Audio Player tab
+PyQt5==5.15.9
+qdarkstyle==3.0.2
+PyQt5-Qt5==5.15.2
+PyQt5-sip==12.11.0
+qdarkstyle==3.0.2
+
+# Audio processing
+ffmpeg-python>=0.2.0
+
+# YouTube API interactions
+google-api-python-client>=2.86.0
+google-auth>=2.16.0
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.1.0
+
+# Testing
+pytest>=7.3.1
+
+# Development tools
+pylint>=2.17.0
+black>=23.3.0
+
+# for installation
+pyinstaller>=5.11.0
+```
+f run_console.bat
+c ```
+@echo off
+echo Starting YouTube Playlist Downloader (Console)...
+call "venv\Scripts\activate.bat"
+python main.py
+pause
+
+```
+f run_gui.bat
+c ```
+@echo off
+echo Starting YouTube Playlist Downloader (GUI)...
+call "venv\Scripts\activate.bat"
+python gui_app/main_window.py
+pause
+
+```
+d scoring
+  f scoring\__init__.py
+  c ```
+  """
+  Scoring package for determining optimal play order of audio files.
+  """
+  from scoring.score_calculator import ScoreCalculator
+  from scoring.queue_manager import QueueManager
+  from scoring.metrics_tracker import MetricsTracker
+  
+  __all__ = ['ScoreCalculator', 'QueueManager', 'MetricsTracker']
+  
+  ```
+  f scoring\metrics_tracker.py
+  c ```
+  """
+  Metrics tracker module.
+  Tracks performance metrics for scoring system optimization.
+  """
+  import os
+  import json
+  import logging
+  from typing import Dict, List, Optional
+  from datetime import datetime
+  
+  # Metrics tracking implementation would go here
+  
+  ```
+  f scoring\queue_manager.py
+  c ```
+  """
+  Queue manager module.
+  Creates and manages play queues based on calculated scores.
+  """
+  import logging
+  from typing import Dict, List, Optional
+  from datetime import datetime
+  
+  # Queue management implementation would go here
+  
+  ```
+  f scoring\score_calculator.py
+  c ```
+  """
+  Score calculator module.
+  Implements algorithms to score audio files based on various metrics.
+  """
+  import logging
+  from typing import Dict, List, Optional
+  import math
+  from datetime import datetime
+  
+  # Scoring algorithm implementation would go here
+  
+  ```
+  f scoring\time_effects.py
+  c ```
+  """
+  Time effects module.
+  Handles time-of-day impacts on content scoring.
+  """
+  import logging
+  from typing import Dict, Optional
+  from datetime import datetime, time
+  
+  # Time effects implementation would go here
+  
+  ```
+f setup.py
+d tests
+  f tests\__init__.py
+  c ```
+  """
+  Tests package for YouTube Playlist Downloader.
+  """
+  
+  ```
+  d tests\test_data
+    f tests\test_data\__init__.py
+    c ```
+    """
+    Data tests package.
+    """
+    
+    ```
+    f tests\test_data\test_config_manager.py
+    c ```
+    """
+    Tests for configuration manager module.
+    """
+    import unittest
+    from unittest.mock import patch, MagicMock
+    
+    # Configuration manager tests would go here
+    
+    ```
+    f tests\test_data\test_file_manager.py
+    c ```
+    """
+    Tests for file manager module.
+    """
+    import unittest
+    from unittest.mock import patch, MagicMock
+    
+    # File manager tests would go here
+    
+    ```
+    f tests\test_data\test_json_storage.py
+    c ```
+    """
+    Tests for JSON storage module.
+    """
+    import unittest
+    from unittest.mock import patch, MagicMock
+    
+    # JSON storage tests would go here
+    
+    ```
+    f tests\test_data\test_storage.py
+    c ```
+    """
+    Tests for storage interface module.
+    """
+    import unittest
+    from unittest.mock import patch, MagicMock
+    
+    # Storage interface tests would go here
+    
+    ```
+  d tests\test_downloader
+    f tests\test_downloader\__init__.py
+    c ```
+    """
+    Downloader tests package.
+    """
+    
+    ```
+    f tests\test_downloader\test_converter.py
+    c ```
+    """
+    Tests for audio converter module.
+    """
+    import unittest
+    from unittest.mock import patch, MagicMock
+    
+    # Audio converter tests would go here
+    
+    ```
+    f tests\test_downloader\test_tracker.py
+    c ```
+    """
+    Tests for download tracker module.
+    """
+    import unittest
+    from unittest.mock import patch, MagicMock
+    
+    # Download tracker tests would go here
+    
+    ```
+    f tests\test_downloader\test_youtube.py
+    c ```
+    """
+    Tests for YouTube downloader module.
+    """
+    import unittest
+    from unittest.mock import patch, MagicMock
+    
+    # YouTube downloader tests would go here
+    
+    ```
+  d tests\test_gui
+    f tests\test_gui\__init__.py
+    c ```
+    """
+    GUI tests package.
+    """
+    
+    ```
+    d tests\test_gui\test_components
+      f tests\test_gui\test_components\__init__.py
+      c ```
+      """
+      GUI components tests package.
+      """
+      
+      ```
+      f tests\test_gui\test_components\test_playlist_panel.py
+      c ```
+      """
+      Tests for playlist panel component module.
+      """
+      import unittest
+      from unittest.mock import patch, MagicMock
+      
+      # Playlist panel component tests would go here
+      
+      ```
+      f tests\test_gui\test_components\test_sidebar.py
+      c ```
+      """
+      Tests for sidebar component module.
+      """
+      import unittest
+      from unittest.mock import patch, MagicMock
+      
+      # Sidebar component tests would go here
+      
+      ```
+    f tests\test_gui\test_sidebar_app.py
+    c ```
+    """
+    Tests for sidebar application module.
+    """
+    import unittest
+    from unittest.mock import patch, MagicMock
+    
+    # Sidebar app tests would go here
+    
+    ```
+    d tests\test_gui\test_views
+      f tests\test_gui\test_views\__init__.py
+      c ```
+      """
+      GUI views tests package.
+      """
+      
+      ```
+      f tests\test_gui\test_views\test_base_view.py
+      c ```
+      """
+      Tests for base view module.
+      """
+      import unittest
+      from unittest.mock import patch, MagicMock
+      
+      # Base view tests would go here
+      
+      ```
+      f tests\test_gui\test_views\test_player_view.py
+      c ```
+      """
+      Tests for player view module.
+      """
+      import unittest
+      from unittest.mock import patch, MagicMock
+      
+      # Player view tests would go here
+      
+      ```
+      f tests\test_gui\test_views\test_playlist_view.py
+      c ```
+      """
+      Tests for playlist view module.
+      """
+      import unittest
+      from unittest.mock import patch, MagicMock
+      
+      # Playlist view tests would go here
+      
+      ```
+  d tests\test_scoring
+    f tests\test_scoring\__init__.py
+    c ```
+    """
+    Scoring tests package.
+    """
+    
+    ```
+    f tests\test_scoring\test_metrics_tracker.py
+    c ```
+    """
+    Tests for metrics tracker module.
+    """
+    import unittest
+    from unittest.mock import patch, MagicMock
+    
+    # Metrics tracker tests would go here
+    
+    ```
+    f tests\test_scoring\test_queue_manager.py
+    c ```
+    """
+    Tests for queue manager module.
+    """
+    import unittest
+    from unittest.mock import patch, MagicMock
+    
+    # Queue manager tests would go here
+    
+    ```
+    f tests\test_scoring\test_score_calculator.py
+    c ```
+    """
+    Tests for score calculator module.
+    """
+    import unittest
+    from unittest.mock import patch, MagicMock
+    
+    # Score calculator tests would go here
+    
+    ```
+  d tests\test_utils
+    f tests\test_utils\__init__.py
+    c ```
+    """
+    Utils tests package.
+    """
+    
+    ```
+    f tests\test_utils\test_helpers.py
+    c ```
+    """
+    Tests for helper functions module.
+    """
+    import unittest
+    from unittest.mock import patch, MagicMock
+    
+    # Helper functions tests would go here
+    
+    ```
+    f tests\test_utils\test_updater.py
+    c ```
+    """
+    Tests for application updater module.
+    """
+    import unittest
+    from unittest.mock import patch, MagicMock
+    
+    # Updater tests would go here
+    
+    ```
+d utils
+  f utils\__init__.py
+  c ```
+  """
+  Utilities package for YouTube Playlist Downloader.
+  """
+  from utils.logger import setup_logging
+  from utils.helpers import clean_filename, format_duration
+  
+  __all__ = ['setup_logging', 'clean_filename', 'format_duration']
+  
+  ```
+  f utils\helpers.py
+  c ```
+  """
+  Helper functions module.
+  Provides various utility functions used throughout the application.
+  """
+  import os
+  import re
+  from typing import Any, Dict, List, Optional, Union
+  
+  # Helper functions implementation would go here
+  
+  ```
+  f utils\logger.py
+  c ```
+  """
+  Logger module.
+  Provides logging configuration for the application.
+  """
+  import os
+  import logging
+  from typing import Optional
+  
+  # Logging implementation would go here
+  
+  ```
+  f utils\updater.py
+f version.py
+c ```
+"""
+Version information for the application.
+"""
+
+# Application version
+__version__ = "1.0.2"
+
+# Repository information
+REPO_OWNER = "samscho98"
+REPO_NAME = "youtube-playlist-downloader"
+```

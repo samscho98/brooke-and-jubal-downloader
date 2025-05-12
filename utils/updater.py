@@ -37,6 +37,14 @@ class Updater:
         self.current_version = current_version
         self.api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}"
         self.base_url = f"https://github.com/{repo_owner}/{repo_name}"
+        
+        # Define data files that should be preserved during updates
+        self.preserved_paths = [
+            os.path.join("gui_app", "playlists.json"),
+            os.path.join("gui_app", "download_history.json"),
+            os.path.join("gui_app", "video_scores.json"),
+            os.path.join("gui_app", "config.ini")
+        ]
     
     def check_for_updates(self) -> Tuple[bool, str, str]:
         """
@@ -165,6 +173,64 @@ class Updater:
         if block_num % 50 == 0:
             logger.info(f"Download progress: {progress}% ({downloaded}/{total_size} bytes)")
     
+    def _backup_preserved_files(self, app_dir: str) -> Dict[str, str]:
+        """
+        Create backups of important data files.
+        
+        Args:
+            app_dir: Application directory path
+            
+        Returns:
+            Dictionary mapping original paths to backup paths
+        """
+        backup_files = {}
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        
+        # Create a temp directory for data backups
+        backup_dir = os.path.join(app_dir, f"data_backup_{timestamp}")
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        logger.info(f"Backing up data files to {backup_dir}")
+        
+        # Backup each preserved file
+        for rel_path in self.preserved_paths:
+            full_path = os.path.join(app_dir, rel_path)
+            if os.path.exists(full_path):
+                # Get filename only
+                filename = os.path.basename(rel_path)
+                # Create backup path
+                backup_path = os.path.join(backup_dir, filename)
+                
+                # Copy the file
+                try:
+                    shutil.copy2(full_path, backup_path)
+                    backup_files[full_path] = backup_path
+                    logger.info(f"Backed up {full_path} to {backup_path}")
+                except Exception as e:
+                    logger.error(f"Failed to backup {full_path}: {str(e)}")
+        
+        return backup_files
+    
+    def _restore_preserved_files(self, backup_files: Dict[str, str]) -> None:
+        """
+        Restore data files from backups.
+        
+        Args:
+            backup_files: Dictionary mapping original paths to backup paths
+        """
+        logger.info("Restoring preserved files from backups")
+        for original_path, backup_path in backup_files.items():
+            if os.path.exists(backup_path):
+                try:
+                    # Make sure directory exists
+                    os.makedirs(os.path.dirname(original_path), exist_ok=True)
+                    
+                    # Copy backup back to original location
+                    shutil.copy2(backup_path, original_path)
+                    logger.info(f"Restored {original_path} from {backup_path}")
+                except Exception as e:
+                    logger.error(f"Failed to restore {original_path}: {str(e)}")
+    
     def install_update(self, zip_path: str) -> bool:
         """
         Install the downloaded update.
@@ -209,9 +275,17 @@ class Updater:
                 logger.error("Failed to create backup")
                 return False
             
+            # Backup preserved files BEFORE updating
+            backup_files = self._backup_preserved_files(app_dir)
+            if not backup_files:
+                logger.warning("No data files were backed up")
+            
             # Copy files from extracted directory to application directory
             logger.info(f"Copying updated files to {app_dir}")
             self._copy_update_files(extracted_dir, app_dir)
+            
+            # Restore preserved files AFTER updating
+            self._restore_preserved_files(backup_files)
             
             # Clean up
             try:
@@ -321,6 +395,31 @@ class Updater:
         
         return essential_items
     
+    def _is_path_preserved(self, path: str, app_dir: str) -> bool:
+        """
+        Check if a path should be preserved during update.
+        
+        Args:
+            path: Absolute path to check
+            app_dir: Application directory path
+            
+        Returns:
+            True if the path should be preserved, False otherwise
+        """
+        # Convert to relative path for comparison
+        try:
+            rel_path = os.path.relpath(path, app_dir)
+            
+            # Check if this path matches any of our preserved paths
+            for preserved in self.preserved_paths:
+                if rel_path == preserved:
+                    return True
+            
+            return False
+        except:
+            # If we can't get a relative path, assume not preserved
+            return False
+    
     def _copy_update_files(self, src_dir: str, dst_dir: str) -> None:
         """
         Copy update files to application directory.
@@ -350,21 +449,55 @@ class Updater:
             dst_item = os.path.join(dst_dir, item)
             
             if os.path.isdir(src_item):
-                # Remove existing directory if it exists
-                if os.path.exists(dst_item):
-                    shutil.rmtree(dst_item)
-                
-                # Copy the directory
-                shutil.copytree(src_item, dst_item)
+                # For directories, we need to handle recursively
+                self._copy_directory_with_preservation(src_item, dst_item, dst_dir)
                 logger.info(f"Copied directory: {item}")
             else:
-                # Remove existing file if it exists
-                if os.path.exists(dst_item):
-                    os.remove(dst_item)
-                
-                # Copy the file
-                shutil.copy2(src_item, dst_item)
-                logger.info(f"Copied file: {item}")
+                # For files, check if it's a preserved file
+                if not self._is_path_preserved(dst_item, dst_dir):
+                    # Remove existing file if it exists
+                    if os.path.exists(dst_item):
+                        os.remove(dst_item)
+                    
+                    # Copy the file
+                    shutil.copy2(src_item, dst_item)
+                    logger.info(f"Copied file: {item}")
+                else:
+                    logger.info(f"Preserved file: {item}")
+    
+    def _copy_directory_with_preservation(self, src_dir: str, dst_dir: str, app_dir: str) -> None:
+        """
+        Copy a directory while preserving specified files.
+        
+        Args:
+            src_dir: Source directory
+            dst_dir: Destination directory
+            app_dir: Application root directory
+        """
+        # Create destination directory if it doesn't exist
+        if not os.path.exists(dst_dir):
+            os.makedirs(dst_dir)
+        
+        # Copy all files and subdirectories
+        for item in os.listdir(src_dir):
+            src_item = os.path.join(src_dir, item)
+            dst_item = os.path.join(dst_dir, item)
+            
+            if os.path.isdir(src_item):
+                # Recursively copy subdirectories
+                self._copy_directory_with_preservation(src_item, dst_item, app_dir)
+            else:
+                # Only copy if it's not a preserved file
+                if not self._is_path_preserved(dst_item, app_dir):
+                    # Remove existing file if it exists
+                    if os.path.exists(dst_item):
+                        os.remove(dst_item)
+                    
+                    # Copy the file
+                    shutil.copy2(src_item, dst_item)
+                    logger.debug(f"Copied file: {os.path.relpath(dst_item, app_dir)}")
+                else:
+                    logger.info(f"Preserved file: {os.path.relpath(dst_item, app_dir)}")
     
     def update_application(self, auto_restart: bool = False) -> bool:
         """

@@ -1,0 +1,3 @@
+"""
+Downloader tests package.
+"""

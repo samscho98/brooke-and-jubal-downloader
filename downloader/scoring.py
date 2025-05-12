@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class ScoringSystem:
     """Class to handle video scoring and performance tracking."""
     
-    def __init__(self, scores_file: str = "gui_app/video_scores.json"):
+    def __init__(self, scores_file: str = "data/video_scores.json"):
         """
         Initialize the scoring system.
         

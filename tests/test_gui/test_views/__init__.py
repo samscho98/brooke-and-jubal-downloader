@@ -1,0 +1,3 @@
+"""
+GUI views tests package.
+"""

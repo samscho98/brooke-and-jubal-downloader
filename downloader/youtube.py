@@ -6,7 +6,7 @@ import os
 import logging
 from typing import Dict, List, Optional, Tuple
 import yt_dlp
-from utils.config_handler import ConfigHandler
+from data.config_manager import ConfigHandler
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class YouTubeDownloader:
     
     def get_video_info(self, video_url: str) -> Optional[Dict]:
         """
-        Get detailed information about a YouTube video including view count.
+        Get detailed information about a YouTube video including view count and comments.
         
         Args:
             video_url: URL of the YouTube video
@@ -58,6 +58,8 @@ class YouTubeDownloader:
             'quiet': True,
             'no_warnings': True,
             'extract_flat': False,  # We want full info
+            'writesubtitles': False,
+            'writeautomaticsub': False,
         }
         
         try:
@@ -70,13 +72,18 @@ class YouTubeDownloader:
                         'id': info.get('id'),
                         'title': info.get('title'),
                         'view_count': info.get('view_count', 0),
+                        'comment_count': info.get('comment_count', 0),  # Make sure to get comment count
+                        'like_count': info.get('like_count', 0),
+                        'dislike_count': info.get('dislike_count', 0),
                         'uploader': info.get('uploader'),
                         'upload_date': info.get('upload_date'),
-                        'duration': info.get('duration'),
+                        'duration': info.get('duration', 0),
+                        'categories': info.get('categories', []),
+                        'tags': info.get('tags', []),
                         'url': video_url
                     }
                     
-                    logger.info(f"Retrieved info for video: {video_info['title']} (Views: {video_info['view_count']})")
+                    logger.info(f"Retrieved info for video: {video_info['title']} (Views: {video_info['view_count']}, Comments: {video_info['comment_count']})")
                     return video_info
                     
                 return None
@@ -297,18 +304,30 @@ class YouTubeDownloader:
                             'id': entry.get('id'),
                             'title': entry.get('title'),
                             'url': video_url,
-                            'duration': entry.get('duration'),
+                            'duration': entry.get('duration', 0),
                             'uploader': entry.get('uploader'),
-                            'view_count': 0  # Default value, will try to update
+                            'view_count': 0,  # Default value, will try to update
+                            'comment_count': 0,  # Default value for comments
+                            'upload_date': None  # Default value for upload date
                         }
                         
-                        # Attempt to get detailed info for view count
-                        # If it fails, we still have the basic info
+                        # Attempt to get detailed info including view count, comment count, and upload date
                         try:
                             detailed_info = self.get_video_info(video_url)
-                            if detailed_info and 'view_count' in detailed_info:
-                                video_info['view_count'] = detailed_info['view_count']
+                            if detailed_info:
+                                # Update with detailed info if available
+                                video_info['view_count'] = detailed_info.get('view_count', 0)
+                                video_info['comment_count'] = detailed_info.get('comment_count', 0)
                                 video_info['upload_date'] = detailed_info.get('upload_date')
+                                
+                                # If duration wasn't in flat info, get it from detailed info
+                                if not video_info['duration'] and 'duration' in detailed_info:
+                                    video_info['duration'] = detailed_info['duration']
+                                    
+                                # Copy any additional metadata that might be useful
+                                for key in ['like_count', 'dislike_count', 'categories', 'tags']:
+                                    if key in detailed_info:
+                                        video_info[key] = detailed_info[key]
                         except Exception as e:
                             logger.warning(f"Could not get detailed info for {video_url}: {str(e)}")
                         

@@ -1,8 +1,7 @@
 """
-Utilities package for the YouTube downloader application.
+Utilities package for YouTube Playlist Downloader.
 """
-from utils.config_handler import ConfigHandler
-from utils.file_manager import FileManager
-from utils.updater import Updater
+from utils.logger import setup_logging
+from utils.helpers import clean_filename, format_duration
 
-__all__ = ['ConfigHandler', 'FileManager', 'Updater']
+__all__ = ['setup_logging', 'clean_filename', 'format_duration']
