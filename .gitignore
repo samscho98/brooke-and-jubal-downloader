@@ -46,6 +46,7 @@ data/playlists.json
 data/video_scores.json
 data/play_history.json
 data/metrics.json
+data/json_backup/
 logs/
 *.log
 

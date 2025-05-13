@@ -63,14 +63,19 @@ class EnhancedDownloadTracker:
             # Update the last_updated timestamp
             self.download_history["last_updated"] = datetime.now().isoformat()
             
+            # Create directory if it doesn't exist
+            history_dir = os.path.dirname(self.history_file)
+            if history_dir:
+                os.makedirs(history_dir, exist_ok=True)
+            
             # Save to file with pretty printing
             with open(self.history_file, 'w', encoding='utf-8') as f:
                 json.dump(self.download_history, f, indent=2, ensure_ascii=False)
             
-            logger.info(f"Successfully saved download history to {self.history_file}")
+            print(f"Successfully saved download history to {self.history_file}")
             return True
         except Exception as e:
-            logger.error(f"Error saving download history: {str(e)}")
+            print(f"Error saving download history: {str(e)}")
             return False
     
     def _load_playlists(self) -> Dict:
@@ -306,6 +311,7 @@ class EnhancedDownloadTracker:
         Returns:
             True if added successfully, False otherwise
         """
+        print(f"Adding video to history: {video_id}, {title}")
         now = datetime.now().isoformat()
         
         # Get the playlist name

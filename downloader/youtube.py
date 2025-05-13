@@ -7,19 +7,21 @@ import logging
 from typing import Dict, List, Optional, Tuple
 import yt_dlp
 from data.config_manager import ConfigHandler
+from utils.path_utils import clean_output_path
 
 logger = logging.getLogger(__name__)
 
 class YouTubeDownloader:
     """Class to handle YouTube video downloading operations."""
     
-    def __init__(self, output_dir: str = "data/audio", config: Optional[ConfigHandler] = None):
+    def __init__(self, output_dir: str = "data/audio", config: Optional[ConfigHandler] = None, tracker = None):
         """
         Initialize the YouTube downloader.
         
         Args:
             output_dir: Directory to save downloaded files
             config: Optional configuration handler
+            tracker: Optional download tracker for updating history
         """
         self.output_dir = output_dir
         self._ensure_output_dir_exists()
@@ -29,6 +31,9 @@ class YouTubeDownloader:
             self.config = ConfigHandler()
         else:
             self.config = config
+        
+        # Store the tracker reference
+        self.tracker = tracker
         
         # Explicitly set FFmpeg path for yt-dlp
         from downloader.converter import FFMPEG_PATH
@@ -210,7 +215,10 @@ class YouTubeDownloader:
                 # Update the scoring system with video metadata
                 try:
                     from downloader.scoring import ScoringSystem
-                    scoring = ScoringSystem()
+                    from utils.path_utils import get_data_path
+                    
+                    # Use path_utils to get the correct path
+                    scoring = ScoringSystem(get_data_path("video_scores.json"))
                     
                     # Determine if this is a new release (less than 14 days old)
                     is_new_release = False
@@ -258,6 +266,60 @@ class YouTubeDownloader:
                     logger.warning(f"Error updating scoring system: {str(e)}")
                     import traceback
                     logger.debug(traceback.format_exc())
+                
+                # Update download tracker if available
+                if hasattr(self, 'tracker') and self.tracker is not None:
+                    try:
+                        # Extract video ID
+                        video_id = video_data['id']
+                        
+                        # Default playlist ID for single videos
+                        playlist_id = "other_videos"
+                        
+                        # Extract playlist ID if available
+                        if "list=" in video_url:
+                            import re
+                            playlist_match = re.search(r'list=([^&]+)', video_url)
+                            if playlist_match:
+                                playlist_id = playlist_match.group(1)
+                        
+                        # This prevents the duplication of paths
+                        from utils.path_utils import get_path
+                        
+                        # Get the absolute app root path
+                        app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                        
+                        # Convert absolute path to relative path from app root
+                        if downloaded_file.startswith(app_root):
+                            relative_path = os.path.relpath(downloaded_file, app_root)
+                            logger.info(f"Converting path from '{downloaded_file}' to '{relative_path}'")
+                            file_path_to_store = relative_path
+                        else:
+                            # If not under app root, keep the original path
+                            file_path_to_store = downloaded_file
+
+                        # Add to download history
+                        logger.info(f"Adding to download history: {video_data['title']}")
+                        # Before adding to download history, clean the path
+                        file_path_to_store = clean_output_path(downloaded_file)
+
+                        self.tracker.add_downloaded_video(
+                            video_id=video_id,
+                            playlist_id=playlist_id,
+                            title=video_data['title'],
+                            file_path=file_path_to_store,
+                            view_count=video_data['view_count'],
+                            comment_count=video_data['comment_count'],
+                            upload_date=video_data['upload_date'],
+                            duration_seconds=video_data['duration']
+                        )
+                        logger.info(f"Successfully added to download history: {video_data['title']}")
+                    except Exception as e:
+                        logger.error(f"Error updating download history: {str(e)}")
+                        import traceback
+                        logger.debug(traceback.format_exc())
+                else:
+                    logger.warning("No tracker available to update download history")
                 
                 logger.info(f"Successfully downloaded: {info.get('title')} (Views: {video_data['view_count']})")
                 return downloaded_file, video_data
@@ -371,13 +433,40 @@ class YouTubeDownloader:
             
             if result:
                 downloaded_file, video_info = result
-                successful.append({
-                    'id': video['id'],
-                    'title': video['title'],
-                    'file_path': downloaded_file,
-                    'view_count': video_info.get('view_count', 0),
-                    'upload_date': video_info.get('upload_date')
-                })
+        
+                # If we have a tracker, update it
+                if self.tracker:
+                    # Extract video ID from URL
+                    import re
+                    if "youtube.com/watch" in video_url:
+                        match = re.search(r'v=([^&]+)', video_url)
+                        if match:
+                            video_id = match.group(1)
+                    elif "youtu.be/" in video_url:
+                        match = re.search(r'youtu\.be/([^?]+)', video_url)
+                        if match:
+                            video_id = match.group(1)
+                    else:
+                        video_id = video_info.get('id', '')
+                        
+                    # Extract playlist ID from URL
+                    playlist_id = "other_videos"  # Default for single videos
+                    if "list=" in video_url:
+                        playlist_match = re.search(r'list=([^&]+)', video_url)
+                        if playlist_match:
+                            playlist_id = playlist_match.group(1)
+                            
+                    # Add to download history
+                    self.tracker.add_downloaded_video(
+                        video_id=video_id,
+                        playlist_id=playlist_id,
+                        title=video_info.get('title', 'Unknown Title'),
+                        file_path=downloaded_file,
+                        view_count=video_info.get('view_count', 0),
+                        comment_count=video_info.get('comment_count', 0),
+                        upload_date=video_info.get('upload_date'),
+                        duration_seconds=video_info.get('duration', 0)
+                    )
             else:
                 failed.append(video['id'])
                 

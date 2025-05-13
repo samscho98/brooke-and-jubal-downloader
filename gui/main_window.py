@@ -26,6 +26,8 @@ from gui.pages.analytics_page import AnalyticsPage
 from gui.pages.settings_page import SettingsPage
 from gui.pages.about_page import AboutPage
 
+from utils.path_utils import get_audio_path, get_data_path, get_path
+
 # Import audio components
 from audio.player import AudioPlayer
 
@@ -41,14 +43,22 @@ class YouTubePlaylistDownloaderApp(QWidget):
         self.setMinimumSize(1100, 700)
         
         # Initialize backend components
-        self.config = ConfigHandler("config.ini")
-        self.output_dir = self.config.get("general", "output_directory", "data/audio")
-        self.downloader = YouTubeDownloader(self.output_dir, self.config)
+        self.config = ConfigHandler(get_path("config.ini"))
+        self.output_dir = self.config.get("general", "output_directory", get_data_path("audio"))
+
+        # Create tracker before downloader
         self.tracker = DownloadTracker(
-            history_file="data/download_history.json",
-            playlists_file="data/playlists.json"
+            history_file=get_data_path("download_history.json"),
+            playlists_file=get_data_path("playlists.json")
         )
-        self.scoring = ScoringSystem("data/video_scores.json")
+
+        # Pass tracker to downloader
+        self.downloader = YouTubeDownloader(self.output_dir, self.config, self.tracker)
+
+        # Initialize scoring system with correct path
+        self.scoring = ScoringSystem(get_data_path("video_scores.json"))
+
+        # Initialize audio player
         self.audio_player = AudioPlayer()
         
         # Initialize UI

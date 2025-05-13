@@ -1,3 +1,0 @@
-"""
-Scoring tests package.
-"""
