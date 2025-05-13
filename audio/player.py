@@ -1,44 +1,55 @@
 """
-Audio player module.
+Audio player module for playing audio files.
 """
 import os
 import logging
-from typing import Optional, Dict, Callable
-
-from PyQt5.QtCore import QObject, pyqtSignal, QUrl, QTime
-from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent, QAudio
+from typing import Optional, Dict, Any
+from PyQt5.QtCore import QObject, QUrl, QTimer, pyqtSignal
+from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 
 class AudioPlayer(QObject):
-    """Audio player component with signals for UI integration."""
+    """Audio player for playing sound files."""
     
     # Signals
-    track_started = pyqtSignal(str)  # Track ID
-    track_ended = pyqtSignal()
-    track_paused = pyqtSignal()
-    track_resumed = pyqtSignal()
-    position_changed = pyqtSignal(int)  # Position in milliseconds
-    duration_changed = pyqtSignal(int)  # Duration in milliseconds
-    volume_changed = pyqtSignal(int)    # Volume as percentage (0-100)
-    error_occurred = pyqtSignal(str)    # Error message
+    track_started = pyqtSignal(str)  # Emits video_id when track starts
+    track_ended = pyqtSignal()       # Emits when track ends
+    position_changed = pyqtSignal(int)  # Emits position in milliseconds
+    duration_changed = pyqtSignal(int)  # Emits duration in milliseconds
+    state_changed = pyqtSignal(int)     # Emits player state
+    
+    # Player states
+    STOPPED = 0
+    PLAYING = 1
+    PAUSED = 2
     
     def __init__(self):
         """Initialize the audio player."""
         super().__init__()
+        
+        # Create media player
         self.player = QMediaPlayer()
-        self.current_track_id = None
-        self.current_file_path = None
-        self.volume = 80  # Default volume 80%
         
         # Connect signals
-        self.player.mediaStatusChanged.connect(self._on_media_status_changed)
-        self.player.positionChanged.connect(self._on_position_changed)
-        self.player.durationChanged.connect(self._on_duration_changed)
-        self.player.stateChanged.connect(self._on_state_changed)
-        self.player.error.connect(self._on_error)
+        self.player.positionChanged.connect(self.handle_position_changed)
+        self.player.durationChanged.connect(self.handle_duration_changed)
+        self.player.stateChanged.connect(self.handle_state_changed)
+        self.player.mediaStatusChanged.connect(self.handle_media_status_changed)
         
-        # Set initial volume
-        self.set_volume(self.volume)
-    
+        # Track info
+        self.current_track = None
+        self.current_track_id = None
+        self.current_volume = 80  # Default volume (0-100)
+        
+        # Initialize with volume
+        self.player.setVolume(self.current_volume)
+        
+        # Timer for track end detection (workaround for some platforms)
+        self.track_end_timer = QTimer(self)
+        self.track_end_timer.timeout.connect(self.check_track_end)
+        self.track_end_timer.setInterval(500)  # Check every 500ms
+        
+        logging.info("Audio player initialized")
+        
     def load(self, file_path: str, track_id: Optional[str] = None) -> bool:
         """
         Load an audio file for playback.
@@ -48,208 +59,210 @@ class AudioPlayer(QObject):
             track_id: Optional ID to identify the track
             
         Returns:
-            True if file was loaded successfully, False otherwise
+            True if loaded successfully, False otherwise
         """
         if not os.path.exists(file_path):
             logging.error(f"File not found: {file_path}")
-            self.error_occurred.emit(f"File not found: {file_path}")
             return False
+            
+        # Stop current playback
+        self.stop()
         
-        try:
-            # Create a QUrl from the file path
-            url = QUrl.fromLocalFile(file_path)
-            content = QMediaContent(url)
-            
-            # Load the media
-            self.player.setMedia(content)
-            
-            # Store track info
-            self.current_track_id = track_id
-            self.current_file_path = file_path
-            
-            logging.info(f"Loaded audio file: {file_path}")
-            return True
-            
-        except Exception as e:
-            logging.error(f"Error loading audio file: {str(e)}")
-            self.error_occurred.emit(f"Error loading file: {str(e)}")
-            return False
-    
-    def play(self):
+        # Set up new media content
+        url = QUrl.fromLocalFile(file_path)
+        media = QMediaContent(url)
+        self.player.setMedia(media)
+        
+        # Set volume
+        self.player.setVolume(self.current_volume)
+        
+        # Store track info
+        self.current_track = file_path
+        self.current_track_id = track_id
+        
+        logging.info(f"Loaded audio file: {file_path}")
+        return True
+        
+    def play(self) -> None:
         """Start or resume playback."""
+        logging.info("Playing audio")
         self.player.play()
-    
-    def pause(self):
+        
+        # Start monitoring for track end
+        if not self.track_end_timer.isActive():
+            self.track_end_timer.start()
+            
+    def pause(self) -> None:
         """Pause playback."""
+        logging.info("Pausing audio")
         self.player.pause()
-    
-    def stop(self):
+        
+    def stop(self) -> None:
         """Stop playback."""
+        logging.info("Stopping audio")
         self.player.stop()
-    
-    def seek(self, position_ms: int):
+        
+        # Stop monitoring for track end
+        if self.track_end_timer.isActive():
+            self.track_end_timer.stop()
+        
+    def set_position(self, position_ms: int) -> None:
         """
-        Seek to a specific position.
+        Set the playback position.
         
         Args:
             position_ms: Position in milliseconds
         """
+        logging.debug(f"Setting position to {position_ms}ms")
         self.player.setPosition(position_ms)
-    
-    def set_position(self, position_ms: int):
-        """
-        Set the playback position without playing.
         
-        Args:
-            position_ms: Position in milliseconds
-        """
-        self.player.setPosition(position_ms)
-    
-    def set_position_and_play(self, position_ms: int):
+    def set_position_and_play(self, position_ms: int) -> None:
         """
         Set the playback position and start playing.
         
         Args:
             position_ms: Position in milliseconds
         """
-        self.player.setPosition(position_ms)
-        self.player.play()
-    
-    def set_volume(self, volume: int):
+        self.set_position(position_ms)
+        self.play()
+        
+    def set_volume(self, volume: int) -> None:
         """
-        Set the playback volume.
+        Set the player volume.
         
         Args:
-            volume: Volume as percentage (0-100)
+            volume: Volume level (0-100)
         """
-        # QMediaPlayer volume is from 0-100, matches our percentage
+        # Ensure volume is within range
+        volume = max(0, min(100, volume))
+        
+        logging.debug(f"Setting volume to {volume}")
+        self.current_volume = volume
         self.player.setVolume(volume)
-        self.volume = volume
-        self.volume_changed.emit(volume)
-    
+        
     def get_position(self) -> int:
         """
-        Get the current position in milliseconds.
+        Get the current playback position.
         
         Returns:
             Current position in milliseconds
         """
         return self.player.position()
-    
+        
     def get_duration(self) -> int:
         """
-        Get the total duration in milliseconds.
+        Get the duration of the current track.
         
         Returns:
-            Total duration in milliseconds
+            Duration in milliseconds
         """
         return self.player.duration()
-    
+        
+    def get_state(self) -> int:
+        """
+        Get the current player state.
+        
+        Returns:
+            Player state (STOPPED, PLAYING, PAUSED)
+        """
+        # Map QMediaPlayer states to our constants
+        state = self.player.state()
+        if state == QMediaPlayer.StoppedState:
+            return self.STOPPED
+        elif state == QMediaPlayer.PlayingState:
+            return self.PLAYING
+        elif state == QMediaPlayer.PausedState:
+            return self.PAUSED
+        return self.STOPPED
+        
     def is_playing(self) -> bool:
         """
-        Check if the player is currently playing.
+        Check if audio is currently playing.
         
         Returns:
             True if playing, False otherwise
         """
-        return self.player.state() == QMediaPlayer.PlayingState
+        return self.get_state() == self.PLAYING
     
-    def get_current_track_id(self) -> Optional[str]:
+    def handle_position_changed(self, position: int) -> None:
         """
-        Get the ID of the currently loaded track.
-        
-        Returns:
-            Track ID or None if no track is loaded
-        """
-        return self.current_track_id
-    
-    def format_position(self) -> str:
-        """
-        Format the current position as MM:SS.
-        
-        Returns:
-            Formatted position string
-        """
-        position = self.player.position()
-        time = QTime(0, 0)
-        time = time.addMSecs(position)
-        return time.toString("mm:ss")
-    
-    def format_duration(self) -> str:
-        """
-        Format the total duration as MM:SS.
-        
-        Returns:
-            Formatted duration string
-        """
-        duration = self.player.duration()
-        time = QTime(0, 0)
-        time = time.addMSecs(duration)
-        return time.toString("mm:ss")
-    
-    def _on_media_status_changed(self, status):
-        """
-        Handle media status changes.
+        Handle position change signal from the player.
         
         Args:
-            status: The new media status
-        """
-        if status == QMediaPlayer.LoadedMedia:
-            logging.info(f"Media loaded: {self.current_file_path}")
-            
-        elif status == QMediaPlayer.EndOfMedia:
-            logging.info(f"Media playback ended: {self.current_file_path}")
-            self.track_ended.emit()
-            
-        elif status == QMediaPlayer.InvalidMedia:
-            logging.error(f"Invalid media: {self.current_file_path}")
-            self.error_occurred.emit(f"Invalid media: {self.current_file_path}")
-    
-    def _on_position_changed(self, position):
-        """
-        Handle position changes.
-        
-        Args:
-            position: New position in milliseconds
+            position: Current position in milliseconds
         """
         self.position_changed.emit(position)
-    
-    def _on_duration_changed(self, duration):
+        
+    def handle_duration_changed(self, duration: int) -> None:
         """
-        Handle duration changes.
+        Handle duration change signal from the player.
         
         Args:
             duration: Duration in milliseconds
         """
+        logging.debug(f"Media duration: {duration}ms")
         self.duration_changed.emit(duration)
-    
-    def _on_state_changed(self, state):
+        
+    def handle_state_changed(self, state: int) -> None:
         """
-        Handle player state changes.
+        Handle state change signal from the player.
         
         Args:
-            state: The new player state
+            state: QMediaPlayer state value
         """
-        if state == QMediaPlayer.PlayingState:
+        # Map QMediaPlayer states to our constants
+        if state == QMediaPlayer.StoppedState:
+            mapped_state = self.STOPPED
+        elif state == QMediaPlayer.PlayingState:
+            mapped_state = self.PLAYING
+        elif state == QMediaPlayer.PausedState:
+            mapped_state = self.PAUSED
+        else:
+            mapped_state = self.STOPPED
+            
+        logging.debug(f"Player state changed to: {mapped_state}")
+        self.state_changed.emit(mapped_state)
+        
+    def handle_media_status_changed(self, status: int) -> None:
+        """
+        Handle media status change signal from the player.
+        
+        Args:
+            status: QMediaPlayer media status value
+        """
+        # Check for track start and end events
+        if status == QMediaPlayer.LoadedMedia:
+            logging.debug("Media loaded")
+        elif status == QMediaPlayer.LoadingMedia:
+            logging.debug("Media loading")
+        elif status == QMediaPlayer.BufferingMedia:
+            logging.debug("Media buffering")
+        elif status == QMediaPlayer.BufferedMedia:
+            # This often indicates the media is ready to play
+            logging.debug("Media buffered")
             if self.current_track_id:
                 self.track_started.emit(self.current_track_id)
-            self.track_resumed.emit()
-            logging.info(f"Started playback: {self.current_file_path}")
+        elif status == QMediaPlayer.EndOfMedia:
+            logging.debug("Media ended")
+            self.stop()
+            self.track_ended.emit()
+        elif status == QMediaPlayer.InvalidMedia:
+            logging.error("Invalid media")
+            self.stop()
             
-        elif state == QMediaPlayer.PausedState:
-            self.track_paused.emit()
-            logging.info(f"Paused playback: {self.current_file_path}")
+    def check_track_end(self) -> None:
+        """
+        Check if the track has ended. This is a workaround for platforms
+        where the EndOfMedia status might not be reliable.
+        """
+        # Only check if we're playing and we have a track
+        if self.get_state() == self.PLAYING and self.current_track:
+            position = self.get_position()
+            duration = self.get_duration()
             
-        elif state == QMediaPlayer.StoppedState:
-            logging.info(f"Stopped playback: {self.current_file_path}")
-    
-    def _on_error(self, error):
-        """
-        Handle player errors.
-        
-        Args:
-            error: The error code
-        """
-        error_msg = f"Player error: {self.player.errorString()}"
-        logging.error(error_msg)
-        self.error_occurred.emit(error_msg)
+            # Check if we're at the end of the track
+            # Use a small threshold to account for timing issues
+            if position >= duration - 200 and duration > 0:
+                logging.debug("Track end detected by timer")
+                self.stop()
+                self.track_ended.emit()

@@ -1,5 +1,5 @@
 """
-Main application window for YouTube Playlist Downloader.
+Updated main_window.py with proper initialization of PlayerPage
 """
 import os
 import sys
@@ -162,7 +162,12 @@ class YouTubePlaylistDownloaderApp(QWidget):
         self.stacked_layout = QStackedLayout()
         
         # Create pages
-        self.player_page = PlayerPage(self.tracker, self.scoring, self.audio_player)
+        self.player_page = PlayerPage(
+            self.tracker, 
+            self.scoring, 
+            self.audio_player,
+            self.downloader  # Pass the downloader instance
+        )
         self.playlists_page = PlaylistsPage(self.downloader, self.tracker)
         self.analytics_page = AnalyticsPage()  # Use placeholder version with no parameters
         self.settings_page = SettingsPage(self.config, self.downloader)

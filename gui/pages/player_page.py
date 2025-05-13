@@ -2,6 +2,7 @@
 Audio player page for the YouTube Playlist Downloader.
 """
 import os
+import re
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QMenu, QAction,
@@ -22,12 +23,15 @@ class PlayerPage(QWidget):
     """Audio player page."""
     track_played = pyqtSignal(str)  # Emitted when a track is played (video_id)
     
-    def __init__(self, tracker, scoring, audio_player):
+    def __init__(self, tracker, scoring, audio_player, downloader=None):
         super().__init__()
         self.tracker = tracker
         self.scoring = scoring
         self.audio_player = audio_player
         self.current_track = None
+        
+        # Store reference to the downloader (needed for download dialog)
+        self.downloader = downloader
         
         self.init_ui()
         self.connect_signals()
@@ -283,35 +287,60 @@ class PlayerPage(QWidget):
             if not name:
                 name = "New Playlist"  # Default name
                 
-            # TODO: Implement playlist download with progress dialog
-            QMessageBox.information(self, "Not Implemented", 
-                                   "Playlist download will be implemented in the next phase.")
+            # Create download dialog and start download
+            from gui.dialogs.download_dialog import DownloadDialog
+            download_dialog = DownloadDialog(self)
+            
+            # Connect signals
+            download_dialog.download_completed.connect(self.on_download_completed)
+            
+            # Pass downloader and tracker 
+            download_dialog.downloader = self.downloader  # Make sure we pass the downloader
+            download_dialog.tracker = self.tracker        # Make sure we pass the tracker
+            
+            # Start the download
+            download_dialog.start_download(url, name)
+            download_dialog.exec_()  # Show as modal dialog
             
         else:
             # Single video goes to "Other" playlist
             from gui.dialogs.download_dialog import DownloadDialog
             download_dialog = DownloadDialog(self)
-            download_dialog.start_download(url, "Other")
             
+            # Connect signals
+            download_dialog.download_completed.connect(self.on_download_completed)
+            
+            # Pass downloader and tracker
+            download_dialog.downloader = self.downloader  # Make sure we pass the downloader
+            download_dialog.tracker = self.tracker        # Make sure we pass the tracker
+            
+            # Start the download
+            download_dialog.start_download(url, "Other")
+            download_dialog.exec_()  # Show as modal dialog
+        
         # Clear inputs
         self.url_input.clear()
         self.name_input.clear()
-        
-        # Refresh the queue after download
-        self.refresh_queue()
+    
+    def on_download_completed(self, success, message):
+        """Handle download completion."""
+        if success:
+            # Refresh the queue after successful download
+            self.refresh_queue()
     
     def playlist_double_clicked(self, item):
         """Handle double click on playlist item."""
         row = item.row()
         playlist_name = self.playlists_widget.item(row, 0).text()
         
-        # TODO: Show playlist details dialog
+        # Show playlist details dialog
         QMessageBox.information(self, "Playlist Details", 
                                f"Details for playlist: {playlist_name}\n\nThis will be implemented in the next phase.")
     
     def update_selected_playlists(self):
         """Update selected playlists."""
         selected_playlists = []
+        selected_urls = []
         
         # Get all checked playlists
         for row in range(self.playlists_widget.rowCount()):
@@ -319,14 +348,40 @@ class PlayerPage(QWidget):
             if checkbox_item and checkbox_item.checkState() == Qt.Checked:
                 playlist_name = self.playlists_widget.item(row, 0).text()
                 selected_playlists.append(playlist_name)
+                
+                # Get URL for this playlist from tracker
+                for playlist in self.tracker.get_playlists():
+                    if playlist["name"] == playlist_name:
+                        selected_urls.append(playlist["url"])
+                        break
         
         if not selected_playlists:
             QMessageBox.warning(self, "Selection Error", "Please select at least one playlist to update.")
             return
         
-        # TODO: Implement update with progress dialog
-        QMessageBox.information(self, "Not Implemented", 
-                               f"Updating playlists: {', '.join(selected_playlists)}\n\nThis will be implemented in the next phase.")
+        # Create progress dialog for batch update
+        from gui.dialogs.download_dialog import DownloadDialog
+        
+        # Update each playlist sequentially
+        for i, (name, url) in enumerate(zip(selected_playlists, selected_urls)):
+            # Skip "Other" placeholder playlist
+            if url == "other_videos":
+                continue
+                
+            # Create dialog for this playlist
+            download_dialog = DownloadDialog(self)
+            download_dialog.setWindowTitle(f"Updating Playlist {i+1}/{len(selected_playlists)}: {name}")
+            
+            # Configure dialog
+            download_dialog.downloader = self.downloader
+            download_dialog.tracker = self.tracker
+            
+            # Connect signals
+            download_dialog.download_completed.connect(self.on_download_completed)
+            
+            # Start the download
+            download_dialog.start_download(url, name)
+            download_dialog.exec_()
     
     def play_track(self, row):
         """Play the track at the specified row."""

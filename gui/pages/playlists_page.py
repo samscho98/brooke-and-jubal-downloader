@@ -318,6 +318,9 @@ class PlaylistsPage(QWidget):
                 
                 # Reload playlists
                 self.load_playlists()
+
+                # Emit signal that playlists have been updated
+                self.playlist_updated.emit()
                 
                 # Ask if they want to download now
                 download_now = QMessageBox.question(
@@ -363,6 +366,8 @@ class PlaylistsPage(QWidget):
         
         if confirm == QMessageBox.Yes:
             self.start_download(url, playlist_name)
+            # Emit signal here - only when download actually starts
+            self.playlist_updated.emit()
             
     def start_download(self, url, playlist_name):
         """Start a download operation."""
@@ -445,6 +450,9 @@ class PlaylistsPage(QWidget):
             if success:
                 QMessageBox.information(self, "Success", f"Successfully removed playlist: {playlist_name}")
                 self.load_playlists()
+
+                # Emit signal that playlists have been updated
+                self.playlist_updated.emit()
             else:
                 QMessageBox.warning(self, "Error", "Failed to remove playlist")
     
